@@ -15,9 +15,15 @@
  * limitations under the License.
  */
 
-import { defineComponent, ref, PropType } from 'vue'
-import { NLayoutSider, NMenu } from 'naive-ui'
+import { defineComponent, ref, PropType, h } from 'vue'
+import { NLayoutSider, NMenu, NButton, NIcon, NTooltip } from 'naive-ui'
+import { MenuFoldOutlined, MenuUnfoldOutlined } from '@vicons/antd'
+import { useI18n } from 'vue-i18n'
 import { useMenuClick } from './use-menuClick'
+import styles from './index.module.scss'
+
+const SIDEBAR_WIDTH = 240
+const SIDEBAR_COLLAPSED_WIDTH = 64
 
 const Sidebar = defineComponent({
   name: 'Sidebar',
@@ -41,26 +47,76 @@ const Sidebar = defineComponent({
       'task-group-manage'
     ]
 
+    const { t } = useI18n()
     const { handleMenuClick } = useMenuClick()
 
-    return { collapsedRef, defaultExpandedKeys, handleMenuClick }
+    const toggleCollapsed = () => {
+      collapsedRef.value = !collapsedRef.value
+    }
+
+    return {
+      collapsedRef,
+      defaultExpandedKeys,
+      handleMenuClick,
+      toggleCollapsed,
+      t
+    }
   },
   render() {
+    const collapseIcon = this.collapsedRef
+      ? MenuUnfoldOutlined
+      : MenuFoldOutlined
+    const collapseTip = this.collapsedRef
+      ? this.t('menu.expand_sidebar')
+      : this.t('menu.collapse_sidebar')
+
     return (
       <NLayoutSider
         bordered
         nativeScrollbar={false}
-        show-trigger='bar'
         collapse-mode='width'
         collapsed={this.collapsedRef}
+        width={SIDEBAR_WIDTH}
+        collapsedWidth={SIDEBAR_COLLAPSED_WIDTH}
         onCollapse={() => (this.collapsedRef = true)}
         onExpand={() => (this.collapsedRef = false)}
       >
+        <div
+          class={[
+            styles['collapse-bar'],
+            this.collapsedRef ? styles['collapse-bar-collapsed'] : null
+          ]}
+        >
+          <NTooltip placement='right' trigger='hover'>
+            {{
+              trigger: () => (
+                <NButton
+                  quaternary
+                  circle
+                  size='small'
+                  aria-label={collapseTip}
+                  onClick={this.toggleCollapsed}
+                >
+                  {{
+                    icon: () =>
+                      h(NIcon, { size: 18 }, {
+                        default: () => h(collapseIcon)
+                      })
+                  }}
+                </NButton>
+              ),
+              default: () => collapseTip
+            }}
+          </NTooltip>
+        </div>
         <NMenu
           class='tab-vertical'
           value={this.sideKey}
           options={this.sideMenuOptions}
           defaultExpandedKeys={this.defaultExpandedKeys}
+          collapsed={this.collapsedRef}
+          collapsedWidth={SIDEBAR_COLLAPSED_WIDTH}
+          collapsedIconSize={22}
           onUpdateValue={this.handleMenuClick}
         />
       </NLayoutSider>

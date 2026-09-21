@@ -16,6 +16,8 @@
  */
 
 export default {
+  collapse_sidebar: 'Collapse sidebar',
+  expand_sidebar: 'Expand sidebar',
   home: 'Home',
   project: 'Project',
   resources: 'Resources',

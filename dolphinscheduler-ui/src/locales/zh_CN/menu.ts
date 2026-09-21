@@ -16,6 +16,8 @@
  */
 
 export default {
+  collapse_sidebar: '收起侧栏',
+  expand_sidebar: '展开侧栏',
   home: '首页',
   project: '项目管理',
   resources: '资源中心',

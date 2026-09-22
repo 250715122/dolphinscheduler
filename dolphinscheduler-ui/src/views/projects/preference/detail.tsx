@@ -19,6 +19,7 @@ import { defineComponent } from 'vue'
 import Form from '@/components/form'
 import { useForm } from './use-form'
 import { NButton, NDivider, NSpace, NSwitch } from 'naive-ui'
+import GroupRulesEditor from './components/group-rules-editor'
 
 const PreferenceForm = defineComponent({
   name: 'PreferenceForm',
@@ -70,6 +71,17 @@ const PreferenceForm = defineComponent({
               xGap: 10
             }}
             style={{ marginLeft: '150px' }}
+          />
+          <NDivider />
+          <div style={{ margin: '0 30px 8px', fontWeight: 600 }}>
+            {t('project.preference.group_rules_title')}
+          </div>
+          <GroupRulesEditor
+            value={(model as any).workflowGroupRules || []}
+            disabled={stateRef.value !== 1}
+            onUpdate:value={(v: any) => {
+              ;(model as any).workflowGroupRules = v
+            }}
           />
           <NDivider />
           <NSpace justify='center'>

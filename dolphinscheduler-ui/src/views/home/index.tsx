@@ -29,8 +29,8 @@ import MetricCard from './components/metric-card'
 import InstanceWorkbench from './components/instance-workbench'
 import UpcomingSchedules from './components/upcoming-schedules'
 import ServiceSummary from './components/service-summary'
-import DefinitionCard from './components/definition-card'
-import { GROUP_COLORS } from './adapters/status-groups'
+import TrendPanel from './components/trend-panel'
+import DurationRank from './components/duration-rank'
 import styles from './styles/dashboard.module.scss'
 import type { MetricCardModel, TimePreset } from './types/dashboard'
 
@@ -47,20 +47,30 @@ export default defineComponent({
       loading,
       asOf,
       metrics,
-      statusChips,
-      compactMode,
       workbenchTab,
       instances,
       instanceTotal,
+      instancePage,
+      instancePageSize,
       schedules,
+      scheduleTotal,
+      schedulePage,
+      schedulePageSize,
       service,
       keyword,
+      trendPoints,
+      trendMode,
+      durationPageRows,
+      durationTotal,
+      durationPage,
+      durationPageSize,
       refresh,
       setPreset,
-      setTab,
+      onMetricClick,
       openInstance,
       openMonitor,
-      periodTotal
+      hasAuthorizedProjects,
+      showService,
     } = this
 
     const projectOptions = [
@@ -76,13 +86,6 @@ export default defineComponent({
       { label: t('home.ops_preset_custom'), value: 'custom' }
     ]
 
-    const tabCounts = {
-      failure: metrics.find((m: MetricCardModel) => m.key === 'failure')?.value,
-      running: metrics.find((m: MetricCardModel) => m.key === 'running')?.value,
-      waiting: metrics.find((m: MetricCardModel) => m.key === 'waiting')?.value,
-      all: periodTotal
-    }
-
     const scopeHint =
       workbenchTab === 'running' || workbenchTab === 'waiting'
         ? t('home.ops_scope_snapshot')
@@ -91,145 +94,155 @@ export default defineComponent({
     return (
       <div class={styles.page}>
         <div class={styles.header}>
-          <div>
+          <div class={styles.headerTop}>
             <h1 class={styles.title}>{t('home.ops_title')}</h1>
-            <p class={styles.subtitle}>{t('home.ops_subtitle')}</p>
-          </div>
-          <div class={styles.headerMeta}>
-            <span>
-              {t('home.ops_updated_at')} {asOf || '—'}
-            </span>
-            <span style='display:inline-flex;align-items:center;gap:6px'>
-              {t('home.ops_auto_refresh')}
-              <NSwitch
-                size='small'
-                value={scope.autoRefreshSec > 0}
-                onUpdateValue={(v: boolean) => {
-                  scope.autoRefreshSec = v ? 30 : 0
-                }}
-              />
-            </span>
-            <NButton size='small' loading={loading} onClick={() => refresh()}>
-              {t('home.ops_refresh')}
-            </NButton>
-          </div>
-        </div>
-
-        <div class={styles.filterBar}>
-          <NSelect
-            style='width: 200px'
-            size='small'
-            value={scope.projectCode as any}
-            options={projectOptions}
-            onUpdateValue={(v: number | null) => {
-              scope.projectCode = v
-              scope.projectName =
-                projects.find((p: any) => p.value === v)?.label || ''
-            }}
-          />
-          <NSelect
-            style='width: 150px'
-            size='small'
-            value={scope.entityType}
-            options={[
-              { label: t('home.ops_entity_workflow'), value: 'WORKFLOW' },
-              { label: t('home.ops_entity_task'), value: 'TASK' }
-            ]}
-            onUpdateValue={(v: 'WORKFLOW' | 'TASK') => {
-              scope.entityType = v
-            }}
-          />
-          <NSelect
-            style='width: 140px'
-            size='small'
-            value={scope.timePreset}
-            options={presetOptions}
-            onUpdateValue={(v: TimePreset) => setPreset(v)}
-          />
-          <NDatePicker
-            size='small'
-            type='datetimerange'
-            clearable={false}
-            value={scope.dateRange}
-            onUpdateValue={(v: [number, number] | null) => {
-              if (!v) return
-              scope.timePreset = 'custom'
-              scope.dateRange = v
-            }}
-          />
-        </div>
-
-        <NSpin show={loading}>
-          <div class={styles.metricGrid}>
-            {metrics.map((m: MetricCardModel) => (
-              <MetricCard
-                model={m}
-                active={!!m.clickTab && workbenchTab === m.clickTab}
-                onClick={(card: MetricCardModel) => {
-                  if (card.clickTab) setTab(card.clickTab)
-                }}
-              />
-            ))}
-          </div>
-
-          <div class={styles.statusSummary} style='margin-bottom:16px'>
-            {statusChips.map((chip: { key: keyof typeof GROUP_COLORS; count: number }) => (
-              <span class={styles.statusChip}>
-                <i
-                  class={styles.statusDot}
-                  style={`background:${GROUP_COLORS[chip.key]}`}
+            <div class={styles.headerMeta}>
+              {showService && (
+                <ServiceSummary
+                  model={service}
+                  compact
+                  onOpen={openMonitor}
                 />
-                {t(`home.ops_group_${chip.key}`)} {chip.count}
+              )}
+              <span>
+                {t('home.ops_updated_short')} {asOf || '—'}
               </span>
-            ))}
-            {compactMode && (
-              <span class={styles.statusChip} style='color:var(--ops-text-muted)'>
-                {t('home.ops_compact_hint')}
+              <span style='display:inline-flex;align-items:center;gap:6px'>
+                {t('home.ops_auto_refresh')}
+                <NSwitch
+                  size='small'
+                  value={scope.autoRefreshSec > 0}
+                  onUpdateValue={(v: boolean) => {
+                    scope.autoRefreshSec = v ? 300 : 0
+                  }}
+                />
               </span>
-            )}
+              <NButton size='small' loading={loading} onClick={() => refresh()}>
+                {t('home.ops_refresh')}
+              </NButton>
+            </div>
+          </div>
+          <div class={styles.headerFilters}>
+            <NSelect
+              style='width: 180px'
+              size='small'
+              value={scope.projectCode as any}
+              options={projectOptions}
+              onUpdateValue={(v: number | null) => {
+                scope.projectCode = v
+                scope.projectName =
+                  projects.find((p: any) => p.value === v)?.label || ''
+              }}
+            />
+            <NSelect
+              style='width: 130px'
+              size='small'
+              value={scope.timePreset}
+              options={presetOptions}
+              onUpdateValue={(v: TimePreset) => setPreset(v)}
+            />
+            <NDatePicker
+              size='small'
+              type='datetimerange'
+              clearable={false}
+              style='width: 320px'
+              value={scope.dateRange}
+              onUpdateValue={(v: [number, number] | null) => {
+                if (!v) return
+                scope.timePreset = 'custom'
+                scope.dateRange = v
+              }}
+            />
+          </div>
+        </div>
+
+        <div class={styles.contentGrow}><NSpin show={loading} class={styles.spinFill}>
+          {!hasAuthorizedProjects ? (
+            <div class={styles.card} style='margin-bottom:12px'>
+              <div class={styles.emptyHint}>
+                {t('home.ops_no_authorized_project')}
+              </div>
+            </div>
+          ) : null}
+
+          <div
+            class={styles.metricRow}
+            style={
+              !hasAuthorizedProjects
+                ? 'opacity:0.45;pointer-events:none'
+                : undefined
+            }
+          >
+            <div class={styles.metricGrid}>
+              {metrics.map((m: MetricCardModel) => (
+                <MetricCard
+                  model={m}
+                  active={
+                    !!m.clickTab &&
+                    workbenchTab === m.clickTab &&
+                    (!m.entityType || scope.entityType === m.entityType)
+                  }
+                  onClick={(card: MetricCardModel) => onMetricClick(card)}
+                />
+              ))}
+            </div>
           </div>
 
           <div class={styles.mainGrid}>
-            <div class={styles.main}>
+            <div class={styles.colWorkbench}>
               <InstanceWorkbench
                 tab={workbenchTab}
-                counts={tabCounts as any}
                 rows={instances}
                 total={instanceTotal}
+                page={instancePage}
+                pageSize={instancePageSize}
                 loading={loading}
                 keyword={keyword}
                 scopeHint={scopeHint}
                 entityLabel={
-                  scope.entityType === 'WORKFLOW'
+                  workbenchTab === 'workflow' || scope.entityType === 'WORKFLOW'
                     ? t('home.ops_entity_workflow')
                     : t('home.ops_entity_task')
                 }
-                onUpdateTab={(tab: any) => setTab(tab)}
                 onUpdateKeyword={(v: string) => {
                   this.keyword = v
                 }}
+                onUpdate:page={(p: number) => (this.instancePage = p)}
                 onOpen={openInstance}
               />
             </div>
-            <div class={styles.aside}>
-              <UpcomingSchedules rows={schedules} />
-              <ServiceSummary model={service} onOpen={openMonitor} />
+            <div class={styles.colUpcoming}>
+              <UpcomingSchedules
+                rows={schedules}
+                total={scheduleTotal}
+                page={schedulePage}
+                pageSize={schedulePageSize}
+                onUpdate:page={(p: number) => (this.schedulePage = p)}
+              />
+            </div>
+            <div class={styles.colDuration}>
+              <DurationRank
+                rows={durationPageRows}
+                total={durationTotal}
+                page={durationPage}
+                pageSize={durationPageSize}
+                loading={loading}
+                onUpdate:page={(p: number) => (this.durationPage = p)}
+                onOpen={openInstance}
+              />
             </div>
           </div>
 
-          {!compactMode && (
-            <div class={styles.bottomGrid}>
-              <DefinitionCard title={t('home.workflow_definition_statistics')} />
-            </div>
-          )}
-          {compactMode && periodTotal <= 5 && (
-            <div class={styles.card}>
-              <h3 class={styles.cardTitle}>{t('home.ops_trend')}</h3>
-              <div class={styles.emptyHint}>{t('home.ops_trend_sparse')}</div>
-            </div>
-          )}
-        </NSpin>
+          <div class={styles.trendBottom}>
+            <TrendPanel
+              points={trendPoints}
+              mode={trendMode}
+              onUpdate:mode={(m: any) => (this.trendMode = m)}
+            />
+          </div>
+        </NSpin></div>
       </div>
     )
+
   }
 })

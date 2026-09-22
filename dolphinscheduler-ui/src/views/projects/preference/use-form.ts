@@ -67,8 +67,11 @@ export function useForm() {
       memoryMax: -1,
       timeoutFlag: false,
       timeoutNotifyStrategy: ['WARN'],
-      timeout: 30
-    } as INodeData
+      timeout: 30,
+      workflowGroupRules: [] as Array<{ group: string; pattern: string }>
+    } as INodeData & {
+      workflowGroupRules: Array<{ group: string; pattern: string }>
+    }
   })
 
   const setValues = (initialValues: { [field: string]: any }) => {

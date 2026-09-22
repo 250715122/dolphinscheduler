@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import { h, unref } from 'vue'
+import { defineComponent, h, unref } from 'vue'
 import { NSelect } from 'naive-ui'
 import { isFunction } from 'lodash'
 import type { IJsonItem } from '../types'
@@ -24,14 +24,24 @@ export function renderSelect(
   item: IJsonItem,
   fields: { [field: string]: any }
 ) {
-  const { props, field, options = [] } = isFunction(item) ? item() : item
-  return h(NSelect, {
-    ...props,
-    value: fields[field],
-    onUpdateValue: (value: any) => {
-      void (fields[field] = value)
-      if (props?.onUpdateValue) props.onUpdateValue(value)
-    },
-    options: unref(options)
-  })
+  return h(
+    defineComponent({
+      name: 'FormSelect',
+      setup() {
+        return () => {
+          const merged = isFunction(item) ? item() : item
+          const { props = {}, field, options = [] } = merged
+          return h(NSelect, {
+            ...props,
+            value: fields[field],
+            onUpdateValue: (value: any) => {
+              void (fields[field] = value)
+              if (props?.onUpdateValue) props.onUpdateValue(value)
+            },
+            options: unref(options)
+          })
+        }
+      }
+    })
+  )
 }

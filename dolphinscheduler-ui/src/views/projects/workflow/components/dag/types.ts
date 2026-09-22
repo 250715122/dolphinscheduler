@@ -145,6 +145,7 @@ export interface GlobalParam {
 export interface SaveForm {
   name: string
   description: string
+  bizGroup?: string | null
   executionType: string
   timeoutFlag: boolean
   timeout: number

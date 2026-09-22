@@ -28,6 +28,11 @@ import {
   Location
 } from '../../components/dag/types'
 import { createWorkflowDefinition } from '@/service/modules/workflow-definition'
+import {
+  queryProjectPreferenceByProjectCode,
+  updateProjectPreference
+} from '@/service/modules/projects-preference'
+import { syncWorkflowGroupOverride } from '@/views/projects/workflow/common/workflow-group'
 import { useI18n } from 'vue-i18n'
 import Styles from './index.module.scss'
 
@@ -75,7 +80,25 @@ export default defineComponent({
           timeout: saveForm.timeoutFlag ? saveForm.timeout : 0
         },
         projectCode
-      ).then((ignored: any) => {
+      ).then(async (res: any) => {
+        const code =
+          res?.code ??
+          res?.data?.code ??
+          res?.workflowDefinition?.code ??
+          res?.data?.workflowDefinition?.code
+        if (code != null && saveForm.bizGroup) {
+          try {
+            await syncWorkflowGroupOverride(
+              projectCode,
+              code,
+              saveForm.bizGroup,
+              queryProjectPreferenceByProjectCode,
+              updateProjectPreference
+            )
+          } catch {
+            /* preference sync is best-effort */
+          }
+        }
         message.success(t('project.dag.success'))
         router.push({ path: `/projects/${projectCode}/workflow-definition` })
       })

@@ -21,7 +21,8 @@ import {
   ref,
   onMounted,
   watch,
-  getCurrentInstance
+  getCurrentInstance,
+  computed
 } from 'vue'
 import Modal from '@/components/modal'
 import { useI18n } from 'vue-i18n'
@@ -39,6 +40,13 @@ import {
 } from 'naive-ui'
 import { useRoute } from 'vue-router'
 import { verifyName } from '@/service/modules/workflow-definition'
+import { queryProjectPreferenceByProjectCode } from '@/service/modules/projects-preference'
+import {
+  parseGroupFromDescription,
+  applyGroupToDescription,
+  stripGroupFromDescription,
+  DEFAULT_GROUP_RULES
+} from '@/views/projects/workflow/common/workflow-group'
 import './x6-style.scss'
 import { positiveIntegerRegex } from '@/utils/regex'
 import type { SaveForm, WorkflowDefinition, WorkflowInstance } from './types'
@@ -72,6 +80,7 @@ export default defineComponent({
     const formValue = ref<SaveForm>({
       name: '',
       description: '',
+      bizGroup: null,
       executionType: 'PARALLEL',
       timeoutFlag: false,
       timeout: 0,
@@ -80,6 +89,8 @@ export default defineComponent({
       sync: false
     })
     const formRef = ref()
+    const groupOptions = ref<Array<{ label: string; value: string }>>([])
+    const groupOverrides = ref<Record<string, string>>({})
 
     const rule = {
       name: {
@@ -118,6 +129,40 @@ export default defineComponent({
         }
       }
     }
+
+    const loadGroupOptions = async () => {
+      const set = new Set<string>()
+      DEFAULT_GROUP_RULES.forEach((r) => r.group && set.add(r.group))
+      try {
+        const result = await queryProjectPreferenceByProjectCode(projectCode)
+        if (result?.preferences) {
+          const pref = JSON.parse(result.preferences)
+          ;(pref.workflowGroupRules || []).forEach((r: any) => {
+            if (r?.group) set.add(String(r.group))
+          })
+          groupOverrides.value = pref.workflowGroupOverrides || {}
+          Object.values(groupOverrides.value).forEach((g) => {
+            if (g) set.add(String(g))
+          })
+        }
+      } catch {
+        /* ignore */
+      }
+      groupOptions.value = Array.from(set)
+        .sort((a, b) => a.localeCompare(b))
+        .map((g) => ({ label: g, value: g }))
+    }
+
+    const onCreateGroup = (val: string) => {
+      const name = String(val || '').trim()
+      const opt = { label: name, value: name }
+      if (name && !groupOptions.value.find((o) => o.value === name)) {
+        groupOptions.value = [...groupOptions.value, opt]
+      }
+      formValue.value.bizGroup = name || null
+      return opt
+    }
+
     const onSubmit = () => {
       formRef.value.validate(async (valid: any) => {
         if (!valid) {
@@ -125,14 +170,21 @@ export default defineComponent({
             name: formValue.value.name,
             code: props.definition?.workflowDefinition.code
           } as { name: string; code?: number }
+          // bake group into description so create/update persist it
+          const payload: SaveForm = {
+            ...formValue.value,
+            description: applyGroupToDescription(
+              formValue.value.description,
+              formValue.value.bizGroup
+            )
+          }
+          const emitSave = () => context.emit('save', payload)
           if (
             props.definition?.workflowDefinition.name !== formValue.value.name
           ) {
-            verifyName(params, projectCode).then(() =>
-              context.emit('save', formValue.value)
-            )
+            verifyName(params, projectCode).then(() => emitSave())
           } else {
-            context.emit('save', formValue.value)
+            emitSave()
           }
         }
       })
@@ -145,7 +197,16 @@ export default defineComponent({
       const workflow = props.definition?.workflowDefinition
       if (workflow) {
         formValue.value.name = workflow.name
-        formValue.value.description = workflow.description
+        const codeKey = String(workflow.code || '')
+        const fromOverride =
+          codeKey && groupOverrides.value[codeKey]
+            ? groupOverrides.value[codeKey]
+            : null
+        const fromDesc = parseGroupFromDescription(workflow.description)
+        formValue.value.bizGroup = fromOverride || fromDesc || null
+        formValue.value.description = stripGroupFromDescription(
+          workflow.description
+        )
         formValue.value.executionType = workflow.executionType || 'PARALLEL'
         if (workflow.timeout && workflow.timeout > 0) {
           formValue.value.timeoutFlag = true
@@ -159,16 +220,46 @@ export default defineComponent({
             type: param.type
           })
         )
+        if (
+          formValue.value.bizGroup &&
+          !groupOptions.value.find((o) => o.value === formValue.value.bizGroup)
+        ) {
+          groupOptions.value = [
+            ...groupOptions.value,
+            {
+              label: formValue.value.bizGroup,
+              value: formValue.value.bizGroup
+            }
+          ]
+        }
+      } else {
+        formValue.value.bizGroup = null
+        formValue.value.description = ''
       }
     }
 
+    const selectOptions = computed(() => groupOptions.value)
+
     const trim = getCurrentInstance()?.appContext.config.globalProperties.trim
 
-    onMounted(() => updateModalData())
+    onMounted(async () => {
+      await loadGroupOptions()
+      updateModalData()
+    })
 
     watch(
       () => props.definition?.workflowDefinition,
       () => updateModalData()
+    )
+
+    watch(
+      () => props.visible,
+      async (v) => {
+        if (v) {
+          await loadGroupOptions()
+          updateModalData()
+        }
+      }
     )
 
     return () => (
@@ -185,6 +276,23 @@ export default defineComponent({
               allowInput={trim}
               v-model:value={formValue.value.name}
               class='input-name'
+            />
+          </NFormItem>
+          <NFormItem
+            label={t('project.workflow.biz_group')}
+            path='bizGroup'
+          >
+            <NSelect
+              filterable
+              tag
+              clearable
+              placeholder={t('project.workflow.batch_group_placeholder')}
+              options={selectOptions.value}
+              value={formValue.value.bizGroup}
+              onUpdateValue={(v: string | null) =>
+                (formValue.value.bizGroup = v)
+              }
+              onCreate={onCreateGroup}
             />
           </NFormItem>
           <NFormItem label={t('project.dag.description')} path='description'>

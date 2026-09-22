@@ -40,6 +40,7 @@ import {
   DefaultTableWidth
 } from '@/common/column-width-config'
 import type { IDefinitionParam } from './types'
+import { resolveWorkflowGroup } from '@/views/projects/workflow/common/workflow-group'
 import type { Router } from 'vue-router'
 import type { TableColumns, RowKey } from 'naive-ui/es/data-table/src/interface'
 import { useDependencies } from '../../components/dependencies/use-dependencies'
@@ -56,6 +57,8 @@ export function useTable() {
     checkedRowKeys: [] as Array<RowKey>,
     row: {},
     tableData: [],
+    groupRules: [] as Array<{ group: string; pattern: string }>,
+    groupOverrides: {} as Record<string, string>,
     projectCode: ref(Number(router.currentRoute.value.params.projectCode)),
     page: ref(1),
     pageSize: ref(10),
@@ -92,6 +95,30 @@ export function useTable() {
         key: 'id',
         ...COLUMN_WIDTH_CONFIG['index'],
         render: (row, index) => index + 1
+      },
+      {
+        title: t('project.workflow.biz_group'),
+        key: 'bizGroup',
+        width: 120,
+        render: (row: any) => {
+          const g = resolveWorkflowGroup(
+            { name: row.name, description: row.description, code: row.code },
+            variables.groupRules,
+            variables.groupOverrides
+          )
+          return h(
+            NTag,
+            {
+              size: 'small',
+              style: {
+                background: g.color,
+                color: '#fff',
+                border: 'none'
+              }
+            },
+            { default: () => g.name }
+          )
+        }
       },
       {
         title: t('project.workflow.workflow_name'),

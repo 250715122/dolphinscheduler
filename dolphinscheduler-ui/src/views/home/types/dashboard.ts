@@ -1,7 +1,21 @@
 import type { DisplayGroup, EntityType } from '../adapters/status-groups'
 
 export type TimePreset = '1h' | '24h' | 'today' | '7d' | 'custom'
-export type WorkbenchTab = 'failure' | 'running' | 'waiting' | 'all'
+export type WorkbenchTab =
+  | 'failure'
+  | 'running'
+  | 'waiting'
+  | 'all'
+  | 'ran'
+  | 'workflow'
+
+export type MetricKey =
+  | 'workflow'
+  | 'task'
+  | 'ran'
+  | 'waiting'
+  | 'failure'
+  | 'completion'
 
 export interface DashboardScope {
   projectCode: number | null
@@ -13,12 +27,13 @@ export interface DashboardScope {
 }
 
 export interface MetricCardModel {
-  key: string
+  key: MetricKey | string
   label: string
   value: string | number
   hint: string
   tone?: 'default' | 'danger' | 'success' | 'warning' | 'primary'
   clickTab?: WorkbenchTab
+  entityType?: EntityType
   available?: boolean
 }
 
@@ -32,6 +47,7 @@ export interface InstanceRow {
   startTime?: string
   endTime?: string
   duration?: string
+  durationSec?: number
 }
 
 export interface ScheduleRow {
@@ -49,3 +65,11 @@ export interface ServiceSummaryModel {
   databaseOk: boolean | null
   error?: string
 }
+
+export interface TrendPoint {
+  date: string
+  taskCount: number
+  workflowCount: number
+}
+
+export type TrendMode = 'task' | 'workflow'

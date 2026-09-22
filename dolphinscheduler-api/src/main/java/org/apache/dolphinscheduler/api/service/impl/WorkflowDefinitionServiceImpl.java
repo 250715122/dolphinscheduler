@@ -406,7 +406,7 @@ public class WorkflowDefinitionServiceImpl extends BaseServiceImpl implements Wo
                     workflowTaskLineage.setWorkflowDefinitionVersion(workflowDefinitionVersion);
                     workflowTaskLineage.setTaskDefinitionCode(taskDefinitionLog.getCode());
                     workflowTaskLineage.setTaskDefinitionVersion(taskDefinitionLog.getVersion());
-                    workflowTaskLineage.setDeptProjectCode(taskDefinitionLog.getProjectCode());
+                    workflowTaskLineage.setDeptProjectCode(dependentItem.getProjectCode());
                     workflowTaskLineage.setDeptWorkflowDefinitionCode(dependentItem.getDefinitionCode());
                     workflowTaskLineage.setDeptTaskDefinitionCode(dependentItem.getDepTaskCode());
                     workflowTaskLineageList.add(workflowTaskLineage);

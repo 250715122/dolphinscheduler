@@ -1,27 +1,23 @@
 import { defineComponent, PropType, h } from 'vue'
-import { NButton, NDataTable, NInput, NPagination, NTag } from 'naive-ui'
+import { NDataTable, NPagination, NTag } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import styles from '../styles/dashboard.module.scss'
 import { GROUP_COLORS, type DisplayGroup } from '../adapters/status-groups'
-import type { InstanceRow, WorkbenchTab } from '../types/dashboard'
+import { formatDurationSec } from '../adapters/duration'
+import type { InstanceRow } from '../types/dashboard'
 
-const InstanceWorkbench = defineComponent({
-  name: 'OpsInstanceWorkbench',
+const DurationRank = defineComponent({
+  name: 'OpsDurationRank',
   props: {
-    tab: { type: String as PropType<WorkbenchTab>, required: true },
     rows: { type: Array as PropType<InstanceRow[]>, default: () => [] },
     total: { type: Number as PropType<number>, default: 0 },
     page: { type: Number as PropType<number>, default: 1 },
     pageSize: { type: Number as PropType<number>, default: 8 },
-    loading: { type: Boolean as PropType<boolean>, default: false },
-    keyword: { type: String as PropType<string>, default: '' },
-    scopeHint: { type: String as PropType<string>, default: '' },
-    entityLabel: { type: String as PropType<string>, default: '' }
+    loading: { type: Boolean as PropType<boolean>, default: false }
   },
-  emits: ['update:keyword', 'update:page', 'open'],
+  emits: ['update:page', 'open'],
   setup(props, { emit }) {
     const { t } = useI18n()
-
     const groupLabel = (g: DisplayGroup, raw: string) => {
       const key = `home.ops_group_${g}`
       const mapped = t(key)
@@ -32,17 +28,9 @@ const InstanceWorkbench = defineComponent({
       <div class={[styles.card, styles.fixedPanel]}>
         <div class={styles.panelHeader}>
           <div>
-            <h3 class={styles.cardTitle}>{t('home.ops_workbench')}</h3>
-            <p class={styles.cardDesc}>{props.scopeHint}</p>
+            <h3 class={styles.cardTitle}>{t('home.ops_duration_rank')}</h3>
+            <p class={styles.cardDesc}>{t('home.ops_duration_rank_desc')}</p>
           </div>
-          <NInput
-            value={props.keyword}
-            size='small'
-            clearable
-            style='width: 200px'
-            placeholder={t('home.ops_search_instance')}
-            onUpdateValue={(v: string) => emit('update:keyword', v)}
-          />
         </div>
         <div class={styles.panelBody}>
           <div class={styles.tableFill}>
@@ -54,7 +42,14 @@ const InstanceWorkbench = defineComponent({
               style='height: 100%'
               columns={[
                 {
-                  title: props.entityLabel || t('home.ops_col_instance'),
+                  title: '#',
+                  key: 'rank',
+                  width: 44,
+                  render: (_: any, index: number) =>
+                    (props.page - 1) * props.pageSize + index + 1
+                },
+                {
+                  title: t('home.ops_col_instance'),
                   key: 'name',
                   ellipsis: { tooltip: true },
                   render: (row: InstanceRow) =>
@@ -62,8 +57,6 @@ const InstanceWorkbench = defineComponent({
                       'a',
                       {
                         class: styles.linkBtn,
-                        style: 'font-size:13px;font-weight:500',
-                        title: `ID ${row.id}`,
                         onClick: () => emit('open', row)
                       },
                       row.name
@@ -72,13 +65,20 @@ const InstanceWorkbench = defineComponent({
                 {
                   title: t('home.ops_col_project'),
                   key: 'projectName',
-                  width: 110,
+                  width: 100,
                   ellipsis: { tooltip: true }
+                },
+                {
+                  title: t('home.ops_col_duration'),
+                  key: 'duration',
+                  width: 90,
+                  render: (row: InstanceRow) =>
+                    row.duration || formatDurationSec(row.durationSec || 0)
                 },
                 {
                   title: t('home.ops_col_state'),
                   key: 'state',
-                  width: 90,
+                  width: 72,
                   render: (row: InstanceRow) =>
                     h(
                       NTag,
@@ -92,46 +92,11 @@ const InstanceWorkbench = defineComponent({
                       },
                       { default: () => groupLabel(row.group, row.state) }
                     )
-                },
-                {
-                  title: t('home.ops_col_duration'),
-                  key: 'duration',
-                  width: 110,
-                  ellipsis: { tooltip: true },
-                  render: (row: InstanceRow) =>
-                    row.duration || row.endTime || row.startTime || '—'
-                },
-                {
-                  title: t('home.ops_col_action'),
-                  key: 'action',
-                  width: 72,
-                  render: (row: InstanceRow) =>
-                    h(
-                      NButton,
-                      {
-                        text: true,
-                        type: 'primary',
-                        size: 'small',
-                        onClick: () => emit('open', row)
-                      },
-                      { default: () => t('home.ops_open_detail') }
-                    )
                 }
               ]}
               data={props.rows}
             />
           </div>
-          {props.rows.length > 0 && props.rows.length <= 3 ? (
-            <div class={styles.softStatus}>
-              <div class={styles.softStatusStrong}>
-                {t('home.ops_workbench_few', {
-                  n: props.rows.length,
-                  entity: props.entityLabel || t('home.ops_col_instance')
-                })}
-              </div>
-              <div>{t('home.ops_workbench_ok')}</div>
-            </div>
-          ) : null}
         </div>
         <div class={styles.panelFooter}>
           <span class={styles.panelMeta}>
@@ -153,4 +118,4 @@ const InstanceWorkbench = defineComponent({
   }
 })
 
-export default InstanceWorkbench
+export default DurationRank

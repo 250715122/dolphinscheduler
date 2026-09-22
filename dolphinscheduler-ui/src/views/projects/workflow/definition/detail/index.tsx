@@ -26,6 +26,11 @@ import {
   updateWorkflowDefinition
 } from '@/service/modules/workflow-definition'
 import {
+  queryProjectPreferenceByProjectCode,
+  updateProjectPreference
+} from '@/service/modules/projects-preference'
+import { syncWorkflowGroupOverride } from '@/views/projects/workflow/common/workflow-group'
+import {
   WorkflowDefinition,
   SaveForm,
   TaskDefinition,
@@ -103,7 +108,18 @@ export default defineComponent({
         },
         code,
         projectCode
-      ).then((ignored: any) => {
+      ).then(async (ignored: any) => {
+        try {
+          await syncWorkflowGroupOverride(
+            projectCode,
+            code,
+            saveForm.bizGroup,
+            queryProjectPreferenceByProjectCode,
+            updateProjectPreference
+          )
+        } catch {
+          /* preference sync is best-effort */
+        }
         message.success(t('project.dag.success'))
         router.push({ path: `/projects/${projectCode}/workflow-definition` })
       })

@@ -45,7 +45,7 @@ const MetricCard = defineComponent({
             <span>{props.model.label}</span>
           </div>
           <div class={[styles.metricValue, toneClass]}>{props.model.value}</div>
-          <div class={styles.metricHint}>{props.model.hint}</div>
+          <div class={styles.metricHint} title={props.model.hint}>{props.model.hint}</div>
         </div>
       )
     }

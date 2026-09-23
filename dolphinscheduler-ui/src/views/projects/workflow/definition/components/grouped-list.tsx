@@ -28,6 +28,14 @@ const GroupedList = defineComponent({
       type: Object as PropType<WorkflowGroupOverrides>,
       default: () => ({})
     },
+    catalog: {
+      type: Array as PropType<any[]>,
+      default: () => []
+    },
+    autoMatch: {
+      type: Boolean as PropType<boolean>,
+      default: true
+    },
     groupFilter: { type: String as PropType<string | null>, default: null },
     checkedRowKeys: {
       type: Array as PropType<Array<string | number>>,
@@ -49,11 +57,14 @@ const GroupedList = defineComponent({
         const g = resolveWorkflowGroup(
           { name: row.name, description: row.description, code: row.code },
           props.rules,
-          props.overrides
+          props.overrides,
+          props.catalog,
+          props.autoMatch
         )
+        const gName = g.name || t('project.workflow.ungrouped')
         if (props.groupFilter && g.name !== props.groupFilter) return
-        if (!map.has(g.name)) map.set(g.name, { color: g.color, items: [] })
-        map.get(g.name)!.items.push({ ...row, _group: g })
+        if (!map.has(gName)) map.set(gName, { color: g.color, items: [] })
+        map.get(gName)!.items.push({ ...row, _group: g })
       })
       const keys = Array.from(map.keys()).sort((a, b) => a.localeCompare(b))
       if (expanded.value.length === 0 && keys.length) {
@@ -190,11 +201,13 @@ const GroupedList = defineComponent({
                           {row.name}
                         </NButton>
                         <span style='font-size:11px;color:#94a3b8'>
-                          {row._group?.source === 'manual'
-                            ? t('project.workflow.group_source_manual')
-                            : row._group?.source === 'rule'
-                              ? t('project.workflow.group_source_rule')
-                              : t('project.workflow.group_source_prefix')}
+                          {!row._group?.name
+                            ? t('project.workflow.ungrouped')
+                            : row._group?.source === 'manual'
+                              ? t('project.workflow.group_source_manual')
+                              : row._group?.source === 'rule'
+                                ? t('project.workflow.group_source_rule')
+                                : t('project.workflow.ungrouped')}
                           {row.userName ? ` · ${row.userName}` : ''}
                           {row.description
                             ? ` · ${String(row.description).slice(0, 60)}`

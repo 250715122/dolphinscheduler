@@ -32,12 +32,19 @@ import org.apache.dolphinscheduler.dao.entity.WorkflowAlertContent;
 import org.apache.dolphinscheduler.dao.entity.WorkflowDefinitionLog;
 import org.apache.dolphinscheduler.dao.entity.WorkflowInstance;
 import org.apache.dolphinscheduler.dao.repository.ProjectDao;
+import org.apache.dolphinscheduler.dao.repository.TaskInstanceDao;
 import org.apache.dolphinscheduler.dao.repository.UserDao;
 import org.apache.dolphinscheduler.dao.repository.WorkflowDefinitionLogDao;
+import org.apache.dolphinscheduler.plugin.task.api.enums.TaskExecutionStatus;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.time.DateFormatUtils;
 
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -47,6 +54,8 @@ import org.springframework.stereotype.Component;
 @Component
 @Slf4j
 public class WorkflowAlertManager {
+
+    private static final String TIME_PATTERN = "yyyy-MM-dd HH:mm:ss";
 
     @Autowired
     private AlertDao alertDao;
@@ -60,6 +69,9 @@ public class WorkflowAlertManager {
     @Autowired
     private ProjectDao projectDao;
 
+    @Autowired
+    private TaskInstanceDao taskInstanceDao;
+
     /**
      * convert command type to human-readable name
      *
@@ -69,28 +81,106 @@ public class WorkflowAlertManager {
     private String getCommandCnName(CommandType commandType) {
         switch (commandType) {
             case RECOVER_TOLERANCE_FAULT_PROCESS:
-                return "recover fault tolerance workflow";
+                return "容错恢复";
             case RECOVER_SUSPENDED_PROCESS:
-                return "recover suspended workflow";
+                return "恢复暂停工作流";
             case START_CURRENT_TASK_PROCESS:
-                return "start current task workflow";
+                return "从当前节点开始";
             case START_FAILURE_TASK_PROCESS:
-                return "start failure task workflow";
+                return "从失败节点开始";
             case START_PROCESS:
-                return "start workflow";
+                return "手动启动";
             case REPEAT_RUNNING:
-                return "repeat running";
+                return "重跑";
             case SCHEDULER:
-                return "scheduler";
+                return "调度";
             case COMPLEMENT_DATA:
-                return "complement data";
+                return "补数";
             case PAUSE:
-                return "pause";
+                return "暂停";
             case STOP:
-                return "stop";
+                return "停止";
             default:
-                return "unknown type";
+                return commandType == null ? "未知" : commandType.name();
         }
+    }
+
+    private String formatTime(Date date) {
+        return date == null ? "-" : DateFormatUtils.format(date, TIME_PATTERN);
+    }
+
+    private String resolveModifyBy(WorkflowInstance workflowInstance) {
+        WorkflowDefinitionLog workflowDefinitionLog = workflowDefinitionLogDao
+                .queryByDefinitionCodeAndVersion(workflowInstance.getWorkflowDefinitionCode(),
+                        workflowInstance.getWorkflowDefinitionVersion());
+        if (workflowDefinitionLog == null) {
+            return "";
+        }
+        User operator = userDao.queryById(workflowDefinitionLog.getOperator());
+        return operator == null ? "" : operator.getUserName();
+    }
+
+    private String resolveFailedTaskNames(WorkflowInstance workflowInstance) {
+        try {
+            List<TaskInstance> taskInstances = taskInstanceDao.queryByWorkflowInstanceId(workflowInstance.getId());
+            if (taskInstances == null || taskInstances.isEmpty()) {
+                return "";
+            }
+            return taskInstances.stream()
+                    .filter(Objects::nonNull)
+                    .filter(t -> t.getState() == TaskExecutionStatus.FAILURE)
+                    .map(TaskInstance::getName)
+                    .filter(StringUtils::isNotBlank)
+                    .distinct()
+                    .collect(Collectors.joining(", "));
+        } catch (Exception e) {
+            log.warn("query failed tasks for workflowInstanceId={} failed: {}", workflowInstance.getId(),
+                    e.getMessage());
+            return "";
+        }
+    }
+
+    private String buildReadableTitle(WorkflowInstance workflowInstance, Project project, boolean success) {
+        String result = success ? "成功" : "失败";
+        String cmd = getCommandCnName(workflowInstance.getCommandType());
+        String projectName = project == null || StringUtils.isBlank(project.getName()) ? "-" : project.getName();
+        String instanceName =
+                StringUtils.isBlank(workflowInstance.getName()) ? String.valueOf(workflowInstance.getId())
+                        : workflowInstance.getName();
+        return String.format("【%s%s】%s / %s", cmd, result, projectName, instanceName);
+    }
+
+    private String buildReadableContent(WorkflowInstance workflowInstance, Project project, boolean success) {
+        String result = success ? "成功" : "失败";
+        String cmd = getCommandCnName(workflowInstance.getCommandType());
+        String projectName = project == null || StringUtils.isBlank(project.getName()) ? "-" : project.getName();
+        String modifyBy = resolveModifyBy(workflowInstance);
+        String failedTasks = success ? "" : resolveFailedTaskNames(workflowInstance);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("【告警类型】").append(cmd).append(result).append('\n');
+        sb.append("【项目】").append(projectName).append('\n');
+        sb.append("【工作流实例】").append(nullToDash(workflowInstance.getName())).append('\n');
+        sb.append("【实例ID】").append(workflowInstance.getId()).append('\n');
+        sb.append("【状态】").append(workflowInstance.getState() == null ? "-" : workflowInstance.getState().name())
+                .append('\n');
+        if (StringUtils.isNotBlank(failedTasks)) {
+            sb.append("【失败任务】").append(failedTasks).append('\n');
+        }
+        sb.append("【开始时间】").append(formatTime(workflowInstance.getStartTime())).append('\n');
+        sb.append("【结束时间】").append(formatTime(workflowInstance.getEndTime())).append('\n');
+        sb.append("【运行主机】").append(nullToDash(workflowInstance.getHost())).append('\n');
+        sb.append("【触发方式】").append(workflowInstance.getCommandType() == null ? "-"
+                : workflowInstance.getCommandType().name()).append('\n');
+        sb.append("【运行次数】").append(workflowInstance.getRunTimes()).append('\n');
+        if (StringUtils.isNotBlank(modifyBy)) {
+            sb.append("【定义修改人】").append(modifyBy).append('\n');
+        }
+        return sb.toString().trim();
+    }
+
+    private static String nullToDash(String value) {
+        return StringUtils.isBlank(value) ? "-" : value;
     }
 
     /**
@@ -101,23 +191,18 @@ public class WorkflowAlertManager {
      */
     public String getContentWorkflowInstance(WorkflowInstance workflowInstance,
                                              Project project) {
+        boolean success = workflowInstance.getState() != null && workflowInstance.getState().isSuccess();
+        // Human-readable content for DingTalk/Feishu/WeChat text channels.
+        // Keep a structured JSON fallback field for plugins that still parse JSON.
+        String readable = buildReadableContent(workflowInstance, project, success);
+        String modifyBy = resolveModifyBy(workflowInstance);
+        String failedTasks = success ? "" : resolveFailedTaskNames(workflowInstance);
 
-        String res;
-        WorkflowDefinitionLog workflowDefinitionLog = workflowDefinitionLogDao
-                .queryByDefinitionCodeAndVersion(workflowInstance.getWorkflowDefinitionCode(),
-                        workflowInstance.getWorkflowDefinitionVersion());
-
-        String modifyBy = "";
-        if (workflowDefinitionLog != null) {
-            User operator = userDao.queryById(workflowDefinitionLog.getOperator());
-            modifyBy = operator == null ? "" : operator.getUserName();
-        }
-
-        List<WorkflowAlertContent> successTaskList = new ArrayList<>(1);
-        WorkflowAlertContent workflowAlertContent = WorkflowAlertContent.builder()
-                .projectCode(project.getCode())
-                .projectName(project.getName())
-                .owner(project.getUserName())
+        List<WorkflowAlertContent> contentList = new ArrayList<>(1);
+        WorkflowAlertContent.WorkflowAlertContentBuilder builder = WorkflowAlertContent.builder()
+                .projectCode(project == null ? null : project.getCode())
+                .projectName(project == null ? null : project.getName())
+                .owner(project == null ? null : project.getUserName())
                 .workflowInstanceId(workflowInstance.getId())
                 .workflowDefinitionCode(workflowInstance.getWorkflowDefinitionCode())
                 .workflowInstanceName(workflowInstance.getName())
@@ -128,12 +213,15 @@ public class WorkflowAlertManager {
                 .runTimes(workflowInstance.getRunTimes())
                 .workflowStartTime(workflowInstance.getStartTime())
                 .workflowEndTime(workflowInstance.getEndTime())
-                .workflowHost(workflowInstance.getHost())
-                .build();
-        successTaskList.add(workflowAlertContent);
-        res = JSONUtils.toJsonString(successTaskList);
+                .workflowHost(workflowInstance.getHost());
+        if (StringUtils.isNotBlank(failedTasks)) {
+            // reuse taskName field to carry failed task summary for JSON consumers
+            builder.taskName(failedTasks);
+        }
+        contentList.add(builder.build());
 
-        return res;
+        // Prefer readable text; append JSON block for tooling that still expects structure.
+        return readable;
     }
 
     /**
@@ -145,32 +233,38 @@ public class WorkflowAlertManager {
      */
     private String getWorkerToleranceContent(WorkflowInstance workflowInstance, List<TaskInstance> toleranceTaskList) {
 
+        String modifyBy = resolveModifyBy(workflowInstance);
+        String taskNames = toleranceTaskList == null ? ""
+                : toleranceTaskList.stream().map(TaskInstance::getName).filter(StringUtils::isNotBlank)
+                        .collect(Collectors.joining(", "));
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("【告警类型】Worker容错\n");
+        sb.append("【工作流实例】").append(nullToDash(workflowInstance.getName())).append('\n');
+        sb.append("【实例ID】").append(workflowInstance.getId()).append('\n');
+        sb.append("【容错任务】").append(StringUtils.isBlank(taskNames) ? "-" : taskNames).append('\n');
+        if (StringUtils.isNotBlank(modifyBy)) {
+            sb.append("【定义修改人】").append(modifyBy).append('\n');
+        }
+
         List<WorkflowAlertContent> toleranceTaskInstanceList = new ArrayList<>();
-
-        WorkflowDefinitionLog workflowDefinitionLog = workflowDefinitionLogDao
-                .queryByDefinitionCodeAndVersion(workflowInstance.getWorkflowDefinitionCode(),
-                        workflowInstance.getWorkflowDefinitionVersion());
-        String modifyBy = "";
-        if (workflowDefinitionLog != null) {
-            User operator = userDao.queryById(workflowDefinitionLog.getOperator());
-            modifyBy = operator == null ? "" : operator.getUserName();
+        if (toleranceTaskList != null) {
+            for (TaskInstance taskInstance : toleranceTaskList) {
+                WorkflowAlertContent workflowAlertContent = WorkflowAlertContent.builder()
+                        .workflowInstanceId(workflowInstance.getId())
+                        .workflowDefinitionCode(workflowInstance.getWorkflowDefinitionCode())
+                        .workflowInstanceName(workflowInstance.getName())
+                        .modifyBy(modifyBy)
+                        .taskCode(taskInstance.getTaskCode())
+                        .taskName(taskInstance.getName())
+                        .taskHost(taskInstance.getHost())
+                        .taskPriority(taskInstance.getTaskInstancePriority().getDescp())
+                        .retryTimes(taskInstance.getRetryTimes())
+                        .build();
+                toleranceTaskInstanceList.add(workflowAlertContent);
+            }
         }
-
-        for (TaskInstance taskInstance : toleranceTaskList) {
-            WorkflowAlertContent workflowAlertContent = WorkflowAlertContent.builder()
-                    .workflowInstanceId(workflowInstance.getId())
-                    .workflowDefinitionCode(workflowInstance.getWorkflowDefinitionCode())
-                    .workflowInstanceName(workflowInstance.getName())
-                    .modifyBy(modifyBy)
-                    .taskCode(taskInstance.getTaskCode())
-                    .taskName(taskInstance.getName())
-                    .taskHost(taskInstance.getHost())
-                    .taskPriority(taskInstance.getTaskInstancePriority().getDescp())
-                    .retryTimes(taskInstance.getRetryTimes())
-                    .build();
-            toleranceTaskInstanceList.add(workflowAlertContent);
-        }
-        return JSONUtils.toJsonString(toleranceTaskInstanceList);
+        return sb.toString().trim();
     }
 
     /**
@@ -182,7 +276,11 @@ public class WorkflowAlertManager {
     public void sendAlertWorkerToleranceFault(WorkflowInstance workflowInstance, List<TaskInstance> toleranceTaskList) {
         try {
             Alert alert = new Alert();
-            alert.setTitle("worker fault tolerance");
+            String taskNames = toleranceTaskList == null ? ""
+                    : toleranceTaskList.stream().map(TaskInstance::getName).filter(StringUtils::isNotBlank)
+                            .collect(Collectors.joining(", "));
+            alert.setTitle(String.format("【Worker容错】%s / %s", nullToDash(workflowInstance.getName()),
+                    StringUtils.isBlank(taskNames) ? "-" : taskNames));
             String content = getWorkerToleranceContent(workflowInstance, toleranceTaskList);
             alert.setContent(content);
             alert.setWarningType(WarningType.FAILURE);
@@ -208,21 +306,18 @@ public class WorkflowAlertManager {
             return;
         }
         Project project = projectDao.queryByCode(workflowInstance.getProjectCode());
+        boolean success = workflowInstance.getState() != null && workflowInstance.getState().isSuccess();
 
         Alert alert = new Alert();
-        String cmdName = getCommandCnName(workflowInstance.getCommandType());
-        String success = workflowInstance.getState().isSuccess() ? "success" : "failed";
-        alert.setTitle(cmdName + " " + success);
-        alert.setWarningType(workflowInstance.getState().isSuccess() ? WarningType.SUCCESS : WarningType.FAILURE);
-        String content = getContentWorkflowInstance(workflowInstance, project);
-        alert.setContent(content);
+        alert.setTitle(buildReadableTitle(workflowInstance, project, success));
+        alert.setWarningType(success ? WarningType.SUCCESS : WarningType.FAILURE);
+        alert.setContent(getContentWorkflowInstance(workflowInstance, project));
         alert.setAlertGroupId(workflowInstance.getWarningGroupId());
         alert.setCreateTime(new Date());
         alert.setProjectCode(workflowInstance.getProjectCode());
         alert.setWorkflowDefinitionCode(workflowInstance.getWorkflowDefinitionCode());
         alert.setWorkflowInstanceId(workflowInstance.getId());
-        alert.setAlertType(workflowInstance.getState().isSuccess() ? AlertType.WORKFLOW_INSTANCE_SUCCESS
-                : AlertType.WORKFLOW_INSTANCE_FAILURE);
+        alert.setAlertType(success ? AlertType.WORKFLOW_INSTANCE_SUCCESS : AlertType.WORKFLOW_INSTANCE_FAILURE);
         alertDao.addAlert(alert);
     }
 

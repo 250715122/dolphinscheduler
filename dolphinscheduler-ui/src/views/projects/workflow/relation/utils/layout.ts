@@ -20,12 +20,16 @@ export interface RelationNode {
 export interface RelationLink {
   source: string
   target: string
+  /** edge crosses project boundary */
+  external?: boolean
+  /** short label e.g. other project name */
+  label?: string
 }
 
-const COL_GAP = 280
-const ROW_GAP = 100
-const X0 = 100
-const Y0 = 90
+const COL_GAP = 310
+const ROW_GAP = 140
+const X0 = 40
+const Y0 = 40
 
 /** Topological levels from dependency roots (sources with no inbound edges). */
 export function assignTopoLevels(
@@ -101,7 +105,12 @@ export function buildTopoPositions(nodes: RelationNode[], links: RelationLink[])
     .sort((a, b) => a - b)
     .forEach((lv) => {
       const list = buckets.get(lv)!
-      list.sort((a, b) => String(a.name).localeCompare(String(b.name)))
+      list.sort((a, b) => {
+        const ga = String((a as any).bizGroup || a.prefix || '')
+        const gb = String((b as any).bizGroup || b.prefix || '')
+        if (ga !== gb) return ga.localeCompare(gb)
+        return String(a.name).localeCompare(String(b.name))
+      })
       list.forEach((n, idx) => {
         positioned.push({
           ...n,

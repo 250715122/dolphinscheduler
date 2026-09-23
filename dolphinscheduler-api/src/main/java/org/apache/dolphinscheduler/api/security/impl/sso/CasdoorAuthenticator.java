@@ -24,10 +24,12 @@ import org.apache.dolphinscheduler.common.enums.UserType;
 import org.apache.dolphinscheduler.dao.entity.User;
 
 import java.security.MessageDigest;
+import java.util.UUID;
 
 import javax.servlet.http.HttpServletRequest;
 
 import lombok.NonNull;
+import lombok.extern.slf4j.Slf4j;
 
 import org.casbin.casdoor.entity.CasdoorUser;
 import org.casbin.casdoor.service.CasdoorAuthService;
@@ -36,6 +38,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+/**
+ * Casdoor SSO authenticator with native password login fallback.
+ * SSO callback posts UUID state as userName and OAuth code as password;
+ * otherwise credentials are treated as DolphinScheduler username/password.
+ */
+@Slf4j
 public class CasdoorAuthenticator extends AbstractSsoAuthenticator {
 
     @Autowired
@@ -48,7 +56,14 @@ public class CasdoorAuthenticator extends AbstractSsoAuthenticator {
     private String adminUserName;
 
     @Override
-    public User login(@NonNull String userName, String code) {
+    public User login(@NonNull String userName, String passwordOrCode) {
+        if (!isSsoCallback(userName)) {
+            return usersService.queryUser(userName, passwordOrCode);
+        }
+        return loginWithCasdoor(userName, passwordOrCode);
+    }
+
+    private User loginWithCasdoor(String state, String code) {
         ServletRequestAttributes servletRequestAttributes =
                 (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         if (servletRequestAttributes == null) {
@@ -59,11 +74,11 @@ public class CasdoorAuthenticator extends AbstractSsoAuthenticator {
         // Invalid state
         request.getSession().setAttribute(Constants.SSO_LOGIN_USER_STATE, null);
         // Check state to protect from CSRF attack
-        if (originalState == null || !MessageDigest.isEqual(originalState.getBytes(), userName.getBytes())) {
+        if (originalState == null || !MessageDigest.isEqual(originalState.getBytes(), state.getBytes())) {
             return null;
         }
 
-        String token = casdoorAuthService.getOAuthToken(code, userName);
+        String token = casdoorAuthService.getOAuthToken(code, state);
         CasdoorUser casdoorUser = casdoorAuthService.parseJwtToken(token);
         User user = null;
         if (casdoorUser.getName() != null) {
@@ -77,8 +92,25 @@ public class CasdoorAuthenticator extends AbstractSsoAuthenticator {
         return user;
     }
 
+    /**
+     * SSO callback uses UUID.randomUUID() as state (posted as userName).
+     */
+    static boolean isSsoCallback(String userName) {
+        if (userName == null || userName.length() != 36) {
+            return false;
+        }
+        try {
+            UUID.fromString(userName);
+            return true;
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
+    }
+
     public UserType getUserType(String userName) {
-        return adminUserName.equalsIgnoreCase(userName) ? UserType.ADMIN_USER : UserType.GENERAL_USER;
+        return adminUserName != null && adminUserName.equalsIgnoreCase(userName)
+                ? UserType.ADMIN_USER
+                : UserType.GENERAL_USER;
     }
 
     @Override

@@ -32,12 +32,14 @@ import ServiceSummary from './components/service-summary'
 import TrendPanel from './components/trend-panel'
 import DurationRank from './components/duration-rank'
 import styles from './styles/dashboard.module.scss'
+import { useThemeStore } from '@/store/theme/theme'
 import type { MetricCardModel, TimePreset } from './types/dashboard'
 
 export default defineComponent({
   name: 'home',
   setup() {
-    return useDashboard()
+    const themeStore = useThemeStore()
+    return { ...useDashboard(), themeStore }
   },
   render() {
     const {
@@ -71,6 +73,7 @@ export default defineComponent({
       openMonitor,
       hasAuthorizedProjects,
       showService,
+      dashboardMode,
     } = this
 
     const projectOptions = [
@@ -92,10 +95,16 @@ export default defineComponent({
         : t('home.ops_scope_period')
 
     return (
-      <div class={styles.page}>
+      <div class={[styles.page, this.themeStore.darkTheme ? styles.pageDark : null]}>
         <div class={styles.header}>
           <div class={styles.headerTop}>
-            <h1 class={styles.title}>{t('home.ops_title')}</h1>
+            <h1 class={styles.title}>
+              {dashboardMode === 'project'
+                ? t('home.ops_project_title', {
+                    name: scope.projectName || t('home.ops_project_fallback')
+                  })
+                : t('home.ops_title')}
+            </h1>
             <div class={styles.headerMeta}>
               {showService && (
                 <ServiceSummary
@@ -123,17 +132,23 @@ export default defineComponent({
             </div>
           </div>
           <div class={styles.headerFilters}>
-            <NSelect
-              style='width: 180px'
-              size='small'
-              value={scope.projectCode as any}
-              options={projectOptions}
-              onUpdateValue={(v: number | null) => {
-                scope.projectCode = v
-                scope.projectName =
-                  projects.find((p: any) => p.value === v)?.label || ''
-              }}
-            />
+            {dashboardMode === 'project' ? (
+              <span class={styles.headerMeta} style='margin-right:8px'>
+                {t('home.ops_project_locked')}: {scope.projectName || scope.projectCode}
+              </span>
+            ) : (
+              <NSelect
+                style='width: 180px'
+                size='small'
+                value={scope.projectCode as any}
+                options={projectOptions}
+                onUpdateValue={(v: number | null) => {
+                  scope.projectCode = v
+                  scope.projectName =
+                    projects.find((p: any) => p.value === v)?.label || ''
+                }}
+              />
+            )}
             <NSelect
               style='width: 130px'
               size='small'

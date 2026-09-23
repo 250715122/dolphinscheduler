@@ -72,7 +72,12 @@ const Content = defineComponent({
           routeStore.setLastRoute(route.path)
 
           state.isShowSide = route.meta.showSide as boolean
-          if (route.matched[1].path === '/projects/:projectCode') {
+          if (
+            route.matched[1]?.path === '/projects/:projectCode' ||
+            route.path.startsWith('/projects') ||
+            route.path === '/home' ||
+            route.path === '/'
+          ) {
             changeMenuOption(state)
           }
 

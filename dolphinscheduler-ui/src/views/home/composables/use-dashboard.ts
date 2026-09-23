@@ -70,17 +70,40 @@ function parseTimeMs(v?: string): number {
   return Number.isNaN(t) ? 0 : t
 }
 
-export function useDashboard() {
+export type DashboardOptions = {
+  /** home: multi-project aggregate; project: single locked project */
+  mode?: 'home' | 'project'
+  fixedProjectCode?: number | (() => number)
+  fixedProjectName?: string | (() => string)
+}
+
+export function useDashboard(options: DashboardOptions = {}) {
   const { t, locale } = useI18n()
   const router = useRouter()
   const userStore = useUserStore()
   const isAdmin = computed(
     () => (userStore.getUserInfo as UserInfoRes)?.userType === 'ADMIN_USER'
   )
+  const dashboardMode = options.mode || 'home'
+  const resolveFixedCode = () => {
+    const v =
+      typeof options.fixedProjectCode === 'function'
+        ? options.fixedProjectCode()
+        : options.fixedProjectCode
+    const n = Number(v)
+    return Number.isFinite(n) && n > 0 ? n : null
+  }
+  const resolveFixedName = () => {
+    const v =
+      typeof options.fixedProjectName === 'function'
+        ? options.fixedProjectName()
+        : options.fixedProjectName
+    return String(v || '').trim()
+  }
 
   const scope = reactive<DashboardScope>({
-    projectCode: null,
-    projectName: '',
+    projectCode: resolveFixedCode(),
+    projectName: resolveFixedName(),
     entityType: 'TASK',
     timePreset: 'today',
     dateRange: presetRange('today'),
@@ -292,7 +315,15 @@ export function useDashboard() {
     return projects.value.slice(0, 50)
   }
 
-  const hasAuthorizedProjects = computed(() => projects.value.length > 0)
+  const hasAuthorizedProjects = computed(() => {
+    if (dashboardMode === 'project') {
+      const code = resolveFixedCode()
+      if (code == null) return false
+      // authorized if appears in list, or list still loading empty briefly after lock
+      return projects.value.some((p) => Number(p.value) === Number(code))
+    }
+    return projects.value.length > 0
+  })
 
   const showService = computed(
     () => isAdmin.value && !service.value.error
@@ -304,6 +335,13 @@ export function useDashboard() {
       label: p.name,
       value: p.code
     }))
+    if (dashboardMode === 'project') {
+      const code = resolveFixedCode()
+      scope.projectCode = code
+      const hit = projects.value.find((p) => Number(p.value) === Number(code))
+      scope.projectName = hit?.label || resolveFixedName()
+      return
+    }
     // drop selection if no longer authorized
     if (
       scope.projectCode != null &&
@@ -826,6 +864,7 @@ export function useDashboard() {
     todayTotal,
     hasAuthorizedProjects,
     showService,
-    isAdmin
+    isAdmin,
+    dashboardMode
   }
 }

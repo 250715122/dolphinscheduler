@@ -22,7 +22,6 @@ import {
 import {
   resolveWorkflowGroup,
   collectGroups,
-  DEFAULT_GROUP_RULES,
   type WorkflowGroupRule
 } from './utils/workflow-group'
 import { queryProjectPreferenceByProjectCode } from '@/service/modules/projects-preference'
@@ -38,25 +37,29 @@ export function useRelation() {
     labelShow: true,
     loading: false,
     selectedId: null as null | string | number,
-    viewMode: 'timeline' as ViewMode,
+    viewMode: 'topology' as ViewMode,
+    filterCollapsed: true,
     keyword: '',
     groups: [] as string[],
     groupRules: [] as WorkflowGroupRule[],
+    groupCatalog: [] as any[],
+    groupAutoMatch: true,
     groupOverrides: {} as Record<string, string>,
     status: [] as string[],
     depth: 99,
-    onlyIsolated: false
+    onlyIsolated: false,
+    currentProjectCode: 0 as number
   })
 
   const applyBizGroups = () => {
-    const rules = variables.groupRules?.length
-      ? variables.groupRules
-      : DEFAULT_GROUP_RULES
+    const rules = variables.groupRules || []
     variables.rawNodes = variables.rawNodes.map((n) => {
       const g = resolveWorkflowGroup(
         { name: n.name, description: n.description, code: n.id },
         rules,
-        variables.groupOverrides
+        variables.groupOverrides,
+        variables.groupCatalog,
+        variables.groupAutoMatch
       )
       return {
         ...n,
@@ -75,13 +78,22 @@ export function useRelation() {
         const pref = JSON.parse(result.preferences)
         variables.groupRules = pref.workflowGroupRules || []
         variables.groupOverrides = pref.workflowGroupOverrides || {}
+        variables.groupCatalog = pref.workflowBizGroups || []
+        variables.groupAutoMatch =
+          pref.workflowGroupAutoMatch !== undefined
+            ? !!pref.workflowGroupAutoMatch
+            : true
       } else {
         variables.groupRules = []
+        variables.groupCatalog = []
         variables.groupOverrides = {}
+        variables.groupAutoMatch = true
       }
     } catch {
       variables.groupRules = []
       variables.groupOverrides = {}
+      variables.groupCatalog = []
+      variables.groupAutoMatch = true
     }
   }
 
@@ -134,6 +146,35 @@ export function useRelation() {
       if (extras.length) {
         variables.rawNodes = [...variables.rawNodes, ...extras]
       }
+      // local project codes from paging; anything else with a projectCode mismatch stays external
+      const localIds = new Set(byCode.keys())
+      variables.rawNodes = variables.rawNodes.map((n) => {
+        const id = String(n.id)
+        if (localIds.has(id)) {
+          return {
+            ...n,
+            projectCode: n.projectCode || projectCode,
+            external: false
+          }
+        }
+        // not in current project definitions → cross-project (or orphan)
+        if (variables.currentProjectCode && !localIds.has(id)) {
+          return { ...n, external: true }
+        }
+        return n
+      })
+      // refresh link external flags
+      variables.rawLinks = variables.rawLinks.map((l) => {
+        const s = variables.rawNodes.find((n) => String(n.id) === String(l.source))
+        const tg = variables.rawNodes.find((n) => String(n.id) === String(l.target))
+        const external = !!(s?.external || tg?.external)
+        let label = l.label || ''
+        if (external && !label) {
+          const other = s?.external ? s : tg?.external ? tg : null
+          label = other?.projectName || ''
+        }
+        return { ...l, external, label }
+      })
       applyBizGroups()
     } catch {
       applyBizGroups()
@@ -173,7 +214,10 @@ export function useRelation() {
     }
   }
 
-  const formatWorkflow = (obj: any) => {
+  const formatWorkflow = (obj: any, projectCode?: number) => {
+    if (projectCode != null && Number.isFinite(projectCode)) {
+      variables.currentProjectCode = Number(projectCode)
+    }
     const payload =
       obj?.data?.workFlowRelationDetailList || obj?.data?.workFlowRelationList
         ? obj.data
@@ -183,22 +227,58 @@ export function useRelation() {
           : obj?.workFlowRelationDetailList || obj?.workFlowRelationList
             ? obj
             : obj?.data || {}
-    variables.rawNodes = (payload.workFlowRelationDetailList || []).map(
-      (item: any) => {
-        return {
-          name: item.workFlowName,
-          id: item.workFlowCode,
-          prefix: extractPrefix(item.workFlowName),
-          ...item
-        } as RelationNode
-      }
-    )
+    const cur = Number(variables.currentProjectCode) || 0
+    const detailList = payload.workFlowRelationDetailList || []
+    const nodeByCode = new Map<string, any>()
+    detailList.forEach((item: any) => {
+      const code = String(item.workFlowCode ?? item.id ?? '')
+      if (!code) return
+      nodeByCode.set(code, item)
+    })
+    variables.rawNodes = detailList.map((item: any) => {
+      const projCode = Number(item.projectCode ?? item.project_code ?? 0)
+      const projectName = String(item.projectName || item.project_name || '')
+      const external = cur > 0 && projCode > 0 && projCode !== cur
+      return {
+        ...item,
+        name: item.workFlowName || item.name,
+        id: item.workFlowCode ?? item.id,
+        prefix: extractPrefix(item.workFlowName || item.name || ''),
+        projectCode: projCode || undefined,
+        projectName,
+        external
+      } as RelationNode
+    })
+    // dedupe by id
+    const seen = new Set<string>()
+    variables.rawNodes = variables.rawNodes.filter((n) => {
+      const id = String(n.id)
+      if (seen.has(id)) return false
+      seen.add(id)
+      return true
+    })
     variables.rawLinks = (payload.workFlowRelationList || [])
       .filter((item: any) => Number(item.sourceWorkFlowCode) !== 0)
-      .map((item: any) => ({
-        source: String(item.sourceWorkFlowCode),
-        target: String(item.targetWorkFlowCode)
-      }))
+      .map((item: any) => {
+        const source = String(item.sourceWorkFlowCode)
+        const target = String(item.targetWorkFlowCode)
+        const sNode = nodeByCode.get(source)
+        const tNode = nodeByCode.get(target)
+        const sProj = Number(sNode?.projectCode ?? sNode?.project_code ?? 0)
+        const tProj = Number(tNode?.projectCode ?? tNode?.project_code ?? 0)
+        const external =
+          cur > 0 &&
+          ((sProj > 0 && sProj !== cur) || (tProj > 0 && tProj !== cur))
+        let label = ''
+        if (external) {
+          if (sProj > 0 && sProj !== cur) {
+            label = sNode?.projectName || sNode?.project_name || String(sProj)
+          } else if (tProj > 0 && tProj !== cur) {
+            label = tNode?.projectName || tNode?.project_name || String(tProj)
+          }
+        }
+        return { source, target, external, label }
+      })
   }
 
   const statusOf = (n: RelationNode) => {
@@ -216,9 +296,9 @@ export function useRelation() {
         description: n.description,
         code: n.id
       })),
-      variables.groupRules?.length ? variables.groupRules : DEFAULT_GROUP_RULES,
-      variables.groupOverrides
-    )
+      variables.groupRules || [],
+      variables.groupOverrides,
+      variables.groupCatalog, variables.groupAutoMatch)
   )
 
   const filteredNodes = computed(() => {
@@ -320,6 +400,26 @@ export function useRelation() {
     return variables.rawNodes.filter((n) => downstream.has(String(n.id)))
   })
 
+  const selectedImpactUpstream = computed(() => {
+    if (!selectedNode.value) return [] as RelationNode[]
+    const { upstream } = neighbors(
+      String(selectedNode.value.id),
+      variables.rawLinks,
+      99
+    )
+    return variables.rawNodes.filter((n) => upstream.has(String(n.id)))
+  })
+
+  const selectedImpactDownstream = computed(() => {
+    if (!selectedNode.value) return [] as RelationNode[]
+    const { downstream } = neighbors(
+      String(selectedNode.value.id),
+      variables.rawLinks,
+      99
+    )
+    return variables.rawNodes.filter((n) => downstream.has(String(n.id)))
+  })
+
   const summary = computed(() =>
     computeSummary(filteredNodes.value, visibleLinks.value)
   )
@@ -349,7 +449,7 @@ export function useRelation() {
         { projectCode }
       )
         .then(async (res: WorkflowRes) => {
-          formatWorkflow(res)
+          formatWorkflow(res, projectCode)
           variables.selectedId = workflowCode
           await loadGroupRules(projectCode)
           await mergeAllDefinitions(projectCode)
@@ -370,7 +470,7 @@ export function useRelation() {
     const { state } = useAsyncState(
       queryWorkFlowList({ projectCode })
         .then(async (res: WorkflowRes) => {
-          formatWorkflow(res)
+          formatWorkflow(res, projectCode)
           await loadGroupRules(projectCode)
           await mergeAllDefinitions(projectCode)
           await mergeCrontabFromSchedules(projectCode)
@@ -384,12 +484,19 @@ export function useRelation() {
     return state
   }
 
-  const selectNode = (id: string | number) => {
-    if (String(variables.selectedId) === String(id)) {
+  const selectNode = (id: string | number, opts?: { keep?: boolean }) => {
+    if (!opts?.keep && String(variables.selectedId) === String(id)) {
       variables.selectedId = null
     } else {
       variables.selectedId = id
     }
+  }
+
+  /** Double-click / focus: keep node and limit to N-hop neighborhood. */
+  const focusNeighborhood = (id: string | number, depth = 2) => {
+    variables.selectedId = id
+    variables.depth = depth
+    variables.onlyIsolated = false
   }
 
   const clearSelection = () => {
@@ -407,9 +514,12 @@ export function useRelation() {
     selectedNode,
     selectedUpstream,
     selectedDownstream,
+    selectedImpactUpstream,
+    selectedImpactDownstream,
     summary,
     availableGroups,
     selectNode,
+    focusNeighborhood,
     clearSelection
   }
 }

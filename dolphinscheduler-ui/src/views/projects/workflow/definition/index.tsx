@@ -107,13 +107,22 @@ export default defineComponent({
           const pref = JSON.parse(result.preferences)
           variables.groupRules = pref.workflowGroupRules || []
           variables.groupOverrides = pref.workflowGroupOverrides || {}
+          variables.groupCatalog = pref.workflowBizGroups || []
+          variables.groupAutoMatch =
+            pref.workflowGroupAutoMatch !== undefined
+              ? !!pref.workflowGroupAutoMatch
+              : true
         } else {
           variables.groupRules = []
           variables.groupOverrides = {}
+          variables.groupCatalog = []
+          variables.groupAutoMatch = true
         }
       } catch {
         variables.groupRules = []
         variables.groupOverrides = {}
+        variables.groupCatalog = []
+        variables.groupAutoMatch = true
       }
     }
 
@@ -129,7 +138,9 @@ export default defineComponent({
           code: r.code
         })),
         variables.groupRules,
-        variables.groupOverrides
+        variables.groupOverrides,
+        variables.groupCatalog,
+        variables.groupAutoMatch
       ).map((g) => ({ label: g, value: g }))
     )
 
@@ -176,7 +187,9 @@ export default defineComponent({
           const g = resolveWorkflowGroup(
             { name: row.name, description: row.description, code: row.code },
             variables.groupRules,
-            variables.groupOverrides
+            variables.groupOverrides,
+            variables.groupCatalog,
+            variables.groupAutoMatch
           )
           if (g.name !== f.bizGroup) return false
         }

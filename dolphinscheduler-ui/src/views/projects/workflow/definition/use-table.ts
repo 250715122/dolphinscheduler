@@ -59,6 +59,8 @@ export function useTable() {
     tableData: [],
     groupRules: [] as Array<{ group: string; pattern: string }>,
     groupOverrides: {} as Record<string, string>,
+    groupCatalog: [] as Array<{ id: string; name: string; color: string; description?: string }>,
+    groupAutoMatch: true,
     projectCode: ref(Number(router.currentRoute.value.params.projectCode)),
     page: ref(1),
     pageSize: ref(10),
@@ -104,8 +106,17 @@ export function useTable() {
           const g = resolveWorkflowGroup(
             { name: row.name, description: row.description, code: row.code },
             variables.groupRules,
-            variables.groupOverrides
+            variables.groupOverrides,
+            variables.groupCatalog,
+            variables.groupAutoMatch
           )
+          if (!g.name) {
+            return h(
+              'span',
+              { style: 'color:#94a3b8' },
+              t('project.workflow.ungrouped')
+            )
+          }
           return h(
             NTag,
             {

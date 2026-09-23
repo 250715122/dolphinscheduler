@@ -643,7 +643,7 @@ CREATE TABLE t_ds_project_preference
     id int NOT NULL  ,
     code bigint NOT NULL,
     project_code bigint NOT NULL,
-    preferences varchar(512) NOT NULL,
+    preferences text NOT NULL,
     user_id int DEFAULT NULL ,
     state int default 1,
     create_time timestamp DEFAULT CURRENT_TIMESTAMP ,

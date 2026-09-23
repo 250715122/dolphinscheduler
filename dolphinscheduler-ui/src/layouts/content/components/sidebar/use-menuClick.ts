@@ -23,6 +23,17 @@ export function useMenuClick() {
   const router: Router = useRouter()
 
   const handleMenuClick = (key: string, menuOption: MenuOption) => {
+    // Prevent Spring Security rejecting "//" when no project is selected
+    if (
+      typeof key === 'string' &&
+      (key.includes('/projects//') ||
+        key === '/projects/' ||
+        key.startsWith('/projects/undefined') ||
+        key.startsWith('/projects/null'))
+    ) {
+      router.push({ path: '/projects/list' })
+      return
+    }
     router.push({
       path: `${key}`,
       query: menuOption.payload ? (menuOption.payload as LocationQueryRaw) : {}

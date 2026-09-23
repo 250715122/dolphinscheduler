@@ -63,12 +63,15 @@
         select
             pd.code as work_flow_code
             ,pd.name as work_flow_name
+            ,pd.project_code as project_code
+            ,proj.name as project_name
             ,pd.release_state as work_flow_publish_status
             ,schd.start_time as schedule_start_time
             ,schd.end_time as schedule_end_time
             ,schd.crontab as crontab
             ,schd.release_state as schedule_publish_status
         from t_ds_workflow_definition pd
+        left join t_ds_project proj on pd.project_code = proj.code
         left join t_ds_schedules schd on pd.code = schd.workflow_definition_code
         where pd.code = #{workflowDefinitionCode}
     </select>
@@ -77,12 +80,15 @@
         select
         pd.code as work_flow_code
         ,pd.name as work_flow_name
+        ,pd.project_code as project_code
+        ,proj.name as project_name
         ,pd.release_state as work_flow_publish_status
         ,schd.start_time as schedule_start_time
         ,schd.end_time as schedule_end_time
         ,schd.crontab as crontab
         ,schd.release_state as schedule_publish_status
         from t_ds_workflow_definition pd
+        left join t_ds_project proj on pd.project_code = proj.code
         left join t_ds_schedules schd on pd.code = schd.workflow_definition_code
         where 1=1
         <if test="workflowDefinitionName != null and workflowDefinitionName != ''">
@@ -112,6 +118,17 @@
         from
         t_ds_workflow_task_lineage
         where workflow_definition_code = #{workflowDefinitionCode}
+    </select>
+
+
+    <select id="queryDownstreamByProjectCode" resultType="org.apache.dolphinscheduler.dao.entity.WorkflowTaskLineage">
+        select
+            <include refid="baseSql"/>
+        from
+        t_ds_workflow_task_lineage
+        where dept_workflow_definition_code in (
+            select code from t_ds_workflow_definition where project_code = #{projectCode}
+        )
     </select>
 
 </mapper>

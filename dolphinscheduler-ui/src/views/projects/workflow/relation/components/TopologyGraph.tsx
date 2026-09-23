@@ -5,21 +5,94 @@ import {
   watch,
   onMounted,
   onBeforeUnmount,
-  getCurrentInstance,
   nextTick
 } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { prefixColor } from '../utils/group'
+import { Graph } from '@antv/x6'
+import { pastelOf, prefixColor, statusAccent } from '../utils/group'
+import { crontabToDayWindow } from '../utils/schedule'
 import type { RelationNode, RelationLink } from '../utils/layout'
-import type { Ref } from 'vue'
-import type { ECharts } from 'echarts'
 
-/**
- * Manual echarts lifecycle (do NOT use @/components/chart initChart here).
- * initChart returns null and its onMounted must be registered from setup;
- * combined with reactive deep-watch dispose loops it left this view blank
- * while Timeline (plain DOM) worked fine.
- */
+const NODE_W = 228
+const NODE_H = 96
+const NODE_NAME = 'relation-card-v2'
+const EDGE_NAME = 'relation-edge-v2'
+
+function ensureRegistry() {
+  try {
+    Graph.unregisterNode(NODE_NAME)
+  } catch {
+    /* ignore */
+  }
+  try {
+    Graph.unregisterEdge(EDGE_NAME)
+  } catch {
+    /* ignore */
+  }
+  Graph.registerNode(NODE_NAME, {
+    inherit: 'rect',
+    width: NODE_W,
+    height: NODE_H,
+    attrs: {
+      body: {
+        rx: 8,
+        ry: 8,
+        strokeWidth: 2,
+        fill: '#fff',
+        stroke: '#16a34a'
+      },
+      label: {
+        fill: '#17233d',
+        fontSize: 13,
+        fontWeight: 600,
+        lineHeight: 18,
+        textWrap: {
+          width: NODE_W - 28,
+          height: NODE_H - 22,
+          ellipsis: true,
+          breakWord: true
+        },
+        refX: 0.5,
+        refY: 0.5,
+        textAnchor: 'middle',
+        textVerticalAnchor: 'middle'
+      }
+    },
+    ports: {
+      groups: {
+        in: {
+          position: { name: 'left' },
+          attrs: {
+            circle: { r: 0, magnet: false, strokeWidth: 0, fill: 'transparent' }
+          }
+        },
+        out: {
+          position: { name: 'right' },
+          attrs: {
+            circle: { r: 0, magnet: false, strokeWidth: 0, fill: 'transparent' }
+          }
+        }
+      },
+      items: [
+        { id: 'in', group: 'in' },
+        { id: 'out', group: 'out' }
+      ]
+    }
+  })
+  Graph.registerEdge(EDGE_NAME, {
+    inherit: 'edge',
+    attrs: {
+      line: {
+        stroke: '#94a3b8',
+        strokeWidth: 1.6,
+        targetMarker: { name: 'block', width: 8, height: 6 }
+      }
+    },
+    connector: { name: 'rounded', args: { radius: 10 } },
+    router: { name: 'normal' }
+  })
+}
+
 const TopologyGraph = defineComponent({
   name: 'RelationTopologyGraph',
   props: {
@@ -30,207 +103,316 @@ const TopologyGraph = defineComponent({
       default: null
     },
     highlightIds: { type: Array as PropType<string[]>, default: () => [] },
-    labelShow: { type: Boolean as PropType<boolean>, default: true }
+    labelShow: { type: Boolean as PropType<boolean>, default: true },
+    fitToken: { type: Number as PropType<number>, default: 0 },
+    darkTheme: { type: Boolean as PropType<boolean>, default: false }
   },
-  emits: ['select'],
+  emits: ['select', 'focus'],
   setup(props, { emit }) {
     const { t } = useI18n()
-    const domRef: Ref<HTMLDivElement | null> = ref(null)
-    let chart: ECharts | null = null
-    // Must capture during setup; getCurrentInstance() is null inside rAF/watch
-    const echartsApi = (
-      getCurrentInstance()?.appContext.config.globalProperties as any
-    )?.echarts
+    const domRef = ref<HTMLDivElement | null>(null)
+    let graph: Graph | null = null
+    let ro: ResizeObserver | null = null
+    let fitTimer: number | null = null
 
     const statusCategory = (n: RelationNode) => {
       const wp = Number(n.workFlowPublishStatus)
       const sp = Number(n.schedulePublishStatus)
-      if (wp === 0) return 1
-      if (wp === 1 && sp === 0) return 2
-      return 0
+      if (wp === 0) return 1 as const
+      if (wp === 1 && sp === 0) return 2 as const
+      return 0 as const
     }
 
-    const buildOption = () => {
+    const scheduleLabel = (n: RelationNode) => {
+      const w = crontabToDayWindow(n.crontab)
+      return w?.label || t('project.workflow.relation_timeline_no_cron')
+    }
+
+    const nodeLabel = (n: RelationNode) => {
+      if (!props.labelShow) return ''
+      const group = n.bizGroup || n.prefix || '—'
+      const sched = scheduleLabel(n)
+      const name = String(n.name || n.id)
+      if (n.external) {
+        const proj =
+          n.projectName ||
+          t('project.workflow.relation_external_project')
+        return `${name}\n[${proj}]\n${group}  ·  L${n.topoLevel ?? 0}`
+      }
+      return `${name}\n${group}  ·  L${n.topoLevel ?? 0}\n●  ${sched}`
+    }
+
+    const fitView = () => {
+      if (!graph || !props.nodes.length) return
+      try {
+        const w = domRef.value?.clientWidth || 0
+        const h = domRef.value?.clientHeight || 0
+        if (w < 40 || h < 40) return
+        graph.resize(w, h)
+        graph.zoomToFit({
+          padding: 48,
+          maxScale: 1.2,
+          minScale: 0.3
+        })
+        graph.centerContent()
+      } catch (e) {
+        console.warn('[TopologyGraph] fitView failed', e)
+      }
+    }
+
+    const scheduleFit = () => {
+      if (fitTimer) window.clearTimeout(fitTimer)
+      fitTimer = window.setTimeout(() => {
+        fitView()
+        fitTimer = null
+      }, 50)
+    }
+
+    const renderGraph = () => {
+      if (!graph) return
       const hl = new Set(props.highlightIds.map(String))
       const selected =
         props.selectedId != null ? String(props.selectedId) : null
 
-      const data = (props.nodes || []).map((n: any) => {
+      const cells: any[] = []
+      ;(props.nodes || []).forEach((n: any) => {
         const id = String(n.id)
         const cat = statusCategory(n)
-        const prefix = n.prefix || 'other'
-        const bizGroup = n.bizGroup || prefix
-        const bizColor = n.bizGroupColor || prefixColor(prefix)
-        const level = n.topoLevel ?? 0
+        const bizColor = n.bizGroupColor || prefixColor(n.prefix || 'other')
+        const accent = statusAccent(cat)
         const focused = !selected || hl.has(id) || id === selected
-        const border =
-          id === selected
-            ? '#2563eb'
-            : cat === 1
-              ? '#f37373'
-              : cat === 2
-                ? '#ba3e3e'
-                : bizColor
-
-        // Prefer layered coordinates; force layout will refine if missing
         const x = Number(n.x)
         const y = Number(n.y)
-
-        const nm = String(n.name || id)
-        // Wider cards so names wrap inside instead of being clipped
-        const cardW = Math.min(210, Math.max(132, Math.ceil(nm.length * 7.2)))
-        const cardH = id === selected ? 58 : 52
-        return {
-          id,
-          name: nm,
-          category: cat,
-          x: Number.isFinite(x) ? x : undefined,
-          y: Number.isFinite(y) ? y : undefined,
-          fixed: Number.isFinite(x) && Number.isFinite(y),
-          topoLevel: level,
-          prefix,
-          bizGroup,
-          bizGroupColor: bizColor,
-          crontab: n.crontab || '-',
-          workFlowPublishStatus: n.workFlowPublishStatus,
-          schedulePublishStatus: n.schedulePublishStatus,
-          symbolSize: [cardW, cardH],
-          itemStyle: {
-            color:
-              cat === 1 ? '#f37373' : cat === 2 ? '#ba3e3e' : bizColor,
-            borderColor: border,
-            borderWidth: id === selected ? 3 : 1,
-            opacity: focused ? 1 : 0.22
-          },
-          label: {
-            show: props.labelShow,
-            position: 'inside',
-            color: '#fff',
-            fontSize: 11,
-            lineHeight: 15,
-            width: cardW - 18,
-            overflow: 'break',
-            formatter: () => `L${level} · ${bizGroup}\n${nm}`
-          }
-        }
+        cells.push(
+          graph!.createNode({
+            id,
+            shape: NODE_NAME,
+            x: Number.isFinite(x) ? x : 0,
+            y: Number.isFinite(y) ? y : 0,
+            width: NODE_W,
+            height: NODE_H,
+            label: nodeLabel(n),
+            attrs: {
+              body: {
+                fill: n.external
+                  ? props.darkTheme
+                    ? 'rgba(148,163,184,0.12)'
+                    : 'rgba(148,163,184,0.10)'
+                  : pastelOf(bizColor),
+                stroke: id === selected
+                  ? '#2563eb'
+                  : n.external
+                    ? '#64748b'
+                    : accent,
+                strokeWidth: id === selected ? 2.5 : n.external ? 2 : 2,
+                strokeDasharray: n.external ? '6 4' : undefined,
+                opacity: focused ? 1 : 0.25
+              },
+              label: {
+                fill: props.darkTheme ? '#e8eaed' : '#17233d',
+                fontSize: 13,
+                fontWeight: 600,
+                lineHeight: 20,
+                textWrap: {
+                  width: NODE_W - 28,
+                  height: NODE_H - 22,
+                  ellipsis: true,
+                  breakWord: true
+                }
+              }
+            },
+            ports: {
+              groups: {
+                in: {
+                  position: 'left',
+                  attrs: {
+                    circle: {
+                      r: 0,
+                      magnet: false,
+                      strokeWidth: 0,
+                      fill: 'transparent'
+                    }
+                  }
+                },
+                out: {
+                  position: 'right',
+                  attrs: {
+                    circle: {
+                      r: 0,
+                      magnet: false,
+                      strokeWidth: 0,
+                      fill: 'transparent'
+                    }
+                  }
+                }
+              },
+              items: [
+                { id: 'in', group: 'in' },
+                { id: 'out', group: 'out' }
+              ]
+            },
+            zIndex: 2
+          })
+        )
       })
 
-      const links = (props.links || []).map((l) => {
+      const idSet = new Set((props.nodes || []).map((n) => String(n.id)))
+      ;(props.links || []).forEach((l, idx) => {
         const s = String(l.source)
         const tg = String(l.target)
+        if (!idSet.has(s) || !idSet.has(tg) || s === tg) return
         const onPath =
           !selected ||
           (hl.has(s) && hl.has(tg)) ||
           s === selected ||
           tg === selected
-        return {
-          source: s,
-          target: tg,
-          lineStyle: {
-            color: onPath && selected ? '#2563eb' : '#94a3b8',
-            width: onPath && selected ? 2.5 : 2,
-            opacity: onPath ? 0.95 : 0.2,
-            curveness: 0.05
-          }
-        }
+        const external = !!(l as any).external
+        const edgeLabel = String((l as any).label || '').trim()
+        cells.push(
+          graph!.createEdge({
+            id: `e-${s}-${tg}-${idx}`,
+            shape: EDGE_NAME,
+            source: { cell: s, port: 'out' },
+            target: { cell: tg, port: 'in' },
+            labels:
+              external && edgeLabel && props.labelShow
+                ? [
+                    {
+                      attrs: {
+                        label: {
+                          text: t('project.workflow.relation_external_edge', {
+                            project: edgeLabel
+                          }),
+                          fill: '#64748b',
+                          fontSize: 11,
+                          fontWeight: 500
+                        },
+                        rect: {
+                          fill: props.darkTheme ? '#1e293b' : '#f8fafc',
+                          stroke: '#cbd5e1',
+                          strokeWidth: 1,
+                          rx: 4,
+                          ry: 4
+                        }
+                      },
+                      position: 0.5
+                    }
+                  ]
+                : [],
+            attrs: {
+              line: {
+                stroke: external
+                  ? onPath && selected
+                    ? '#6366f1'
+                    : '#94a3b8'
+                  : onPath && selected
+                    ? '#2563eb'
+                    : '#94a3b8',
+                strokeWidth: onPath && selected ? 2.2 : 1.5,
+                strokeOpacity: onPath ? 0.95 : 0.25,
+                strokeDasharray: external ? '7 5' : undefined,
+                targetMarker: { name: 'block', width: 8, height: 6 }
+              }
+            },
+            zIndex: 1
+          })
+        )
       })
 
-      return {
-        tooltip: {
-          confine: true,
-          formatter: (params: any) => {
-            if (!params?.data?.name) return ''
-            const d = params.data
-            return `${t('project.workflow.workflow_name')}: ${d.name}<br/>
-${t('project.workflow.relation_level')}: L${d.topoLevel ?? 0}<br/>
-${t('project.workflow.relation_biz_group')}: ${d.bizGroup || d.prefix || '-'}<br/>
-${t('project.workflow.crontab_expression')}: ${d.crontab || '-'}<br/>
-${t('project.workflow.workflow_publish_status')}: ${d.workFlowPublishStatus}<br/>
-${t('project.workflow.schedule_publish_status')}: ${d.schedulePublishStatus}`
-          }
-        },
-        legend: {
-          data: [
-            t('project.workflow.online'),
-            t('project.workflow.workflow_offline'),
-            t('project.workflow.schedule_offline')
-          ],
-          bottom: 8
-        },
-        animationDuration: 400,
-        series: [
-          {
-            type: 'graph',
-            // force is the proven path in upstream Graph.tsx; layered x/y used as seeds
-            layout: 'force',
-            draggable: true,
-            roam: true,
-            force: {
-              repulsion: 560,
-              edgeLength: 200,
-              gravity: 0.03,
-              layoutAnimation: true
-            },
-            symbol: 'roundRect',
-            categories: [
-              { name: t('project.workflow.online') },
-              { name: t('project.workflow.workflow_offline') },
-              { name: t('project.workflow.schedule_offline') }
-            ],
-            edgeSymbol: ['circle', 'arrow'],
-            edgeSymbolSize: [4, 10],
-            data,
-            links,
-            lineStyle: { opacity: 0.9, width: 2, curveness: 0.05 },
-            nodeScaleRatio: 0,
-            zoom: 1
-          }
-        ]
-      }
+      graph.resetCells(cells)
+      scheduleFit()
     }
 
-    const ensureChart = () => {
+    const ensureGraph = () => {
       if (!domRef.value) return null
-      const echarts = echartsApi
-      if (!echarts) {
-        console.error('[TopologyGraph] echarts not found on app globalProperties')
-        return null
-      }
-      if (!chart) {
-        const inst = echarts.init(domRef.value, 'macarons')
-        inst.on('click', (params: any) => {
-          if (params.dataType === 'node' && params.data?.id != null) {
-            emit('select', params.data.id)
-          }
-        })
-        chart = inst
-      }
-      return chart
+      if (graph) return graph
+      ensureRegistry()
+      const w = Math.max(domRef.value.clientWidth, 320)
+      const h = Math.max(domRef.value.clientHeight, 320)
+      graph = new Graph({
+        container: domRef.value,
+        width: w,
+        height: h,
+        panning: true,
+        mousewheel: {
+          enabled: true,
+          modifiers: [],
+          factor: 1.08,
+          maxScale: 2.2,
+          minScale: 0.25
+        },
+        connecting: {
+          connectionPoint: 'anchor',
+          anchor: 'center'
+        },
+        interacting: {
+          nodeMovable: true,
+          edgeMovable: false,
+          edgeLabelMovable: false
+        },
+        background: { color: props.darkTheme ? '#141418' : '#fafbfc' },
+        grid: {
+          size: 12,
+          visible: true,
+          type: 'dot',
+          args: [{ color: props.darkTheme ? '#2a2a32' : '#e5eaf2', thickness: 1 }]
+        }
+      })
+      graph.on('node:click', ({ node }) => emit('select', node.id))
+      graph.on('node:dblclick', ({ node }) => emit('focus', node.id))
+      return graph
     }
 
-    const render = () => {
-      const inst = ensureChart()
-      if (!inst) return
-      const option = buildOption()
-      // false = merge; keep chart alive (avoid blank flashes)
-      inst.setOption(option, { notMerge: true })
-      nextTick(() => inst.resize())
+    const syncSizeAndRender = () => {
+      if (!domRef.value) return
+      const w = domRef.value.clientWidth
+      const h = domRef.value.clientHeight
+      if (w < 40 || h < 40) return
+      if (!graph) ensureGraph()
+      else graph.resize(w, h)
+      renderGraph()
     }
-
-    const onResize = () => chart?.resize()
 
     onMounted(() => {
-      // defer one frame so container has real size
-      requestAnimationFrame(() => {
-        render()
-        window.addEventListener('resize', onResize)
+      nextTick(() => {
+        // wait layout: parent flex height may settle late
+        const tryInit = (attempt = 0) => {
+          const el = domRef.value
+          if (!el) return
+          if (el.clientWidth > 40 && el.clientHeight > 40) {
+            syncSizeAndRender()
+          } else if (attempt < 20) {
+            window.setTimeout(() => tryInit(attempt + 1), 50)
+          } else {
+            // force min size then render
+            el.style.minHeight = '480px'
+            syncSizeAndRender()
+          }
+        }
+        tryInit()
+        if (domRef.value && typeof ResizeObserver !== 'undefined') {
+          ro = new ResizeObserver(() => {
+            if (!graph) syncSizeAndRender()
+            else {
+              const w = domRef.value!.clientWidth
+              const h = domRef.value!.clientHeight
+              if (w > 40 && h > 40) {
+                graph.resize(w, h)
+                scheduleFit()
+              }
+            }
+          })
+          ro.observe(domRef.value)
+        }
       })
     })
 
     onBeforeUnmount(() => {
-      window.removeEventListener('resize', onResize)
-      chart?.dispose()
-      chart = null
+      if (fitTimer) window.clearTimeout(fitTimer)
+      ro?.disconnect()
+      ro = null
+      graph?.dispose()
+      graph = null
     })
 
     watch(
@@ -241,23 +423,44 @@ ${t('project.workflow.schedule_publish_status')}: ${d.schedulePublishStatus}`
         props.highlightIds,
         props.labelShow
       ],
-      () => render(),
+      () => {
+        if (!graph) syncSizeAndRender()
+        else renderGraph()
+      },
       { deep: true }
+    )
+
+    watch(
+      () => props.fitToken,
+      () => scheduleFit()
+    )
+
+    watch(
+      () => props.darkTheme,
+      (dark) => {
+        if (!graph) return
+        graph.drawBackground({ color: dark ? '#141418' : '#fafbfc' })
+        try {
+          graph.drawGrid({
+            type: 'mesh',
+            args: [{ color: dark ? '#2a2a32' : '#e5eaf2', thickness: 1 }]
+          })
+        } catch {}
+        renderGraph()
+      }
     )
 
     return { domRef }
   },
   render() {
-    const h =
-      typeof window !== 'undefined' ? window.innerHeight - 260 : 560
     return (
       <div
         ref='domRef'
         style={{
           width: '100%',
-          height: `${h}px`,
-          minHeight: '520px',
-          background: '#fff'
+          height: '100%',
+          minHeight: '480px',
+          position: 'relative'
         }}
       />
     )

@@ -1,5 +1,11 @@
 import { defineComponent, PropType } from 'vue'
-import { NCheckboxGroup, NCheckbox, NInput, NSelect, NSpace } from 'naive-ui'
+import {
+  NButton,
+  NCheckbox,
+  NInput,
+  NSelect,
+  NSpace
+} from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import styles from '../styles/relation.module.scss'
 
@@ -18,81 +24,78 @@ const FilterPanel = defineComponent({
     'update:groups',
     'update:status',
     'update:depth',
-    'update:onlyIsolated'
+    'update:onlyIsolated',
+    'collapse'
   ],
   setup(props, { emit }) {
     const { t } = useI18n()
     return () => (
-      <div class={styles.panel}>
-        <h3 class={styles.panelTitle}>{t('project.workflow.relation_filters')}</h3>
-        <div class={styles.filterGroup}>
-          <div class={styles.filterLabel}>{t('project.workflow.relation_search')}</div>
-          <NInput
-            value={props.keyword}
-            clearable
-            size='small'
-            placeholder={t('project.workflow.workflow_name')}
-            onUpdateValue={(v) => emit('update:keyword', v)}
-          />
-        </div>
-        {props.availableGroups.length > 0 && (
-          <div class={styles.filterGroup}>
-            <div class={styles.filterLabel}>
-              {t('project.workflow.relation_biz_group')}
-            </div>
-            <NCheckboxGroup
-              value={props.groups}
-              onUpdateValue={(v) => emit('update:groups', v)}
-            >
-              <NSpace vertical size={4}>
-                {props.availableGroups.map((g) => (
-                  <NCheckbox value={g} label={g} />
-                ))}
-              </NSpace>
-            </NCheckboxGroup>
-          </div>
-        )}
-        <div class={styles.filterGroup}>
-          <div class={styles.filterLabel}>{t('project.workflow.relation_status')}</div>
-          <NCheckboxGroup
-            value={props.status}
-            onUpdateValue={(v) => emit('update:status', v)}
-          >
-            <NSpace vertical size={4}>
-              <NCheckbox value='online' label={t('project.workflow.online')} />
-              <NCheckbox
-                value='workflow_offline'
-                label={t('project.workflow.workflow_offline')}
-              />
-              <NCheckbox
-                value='schedule_offline'
-                label={t('project.workflow.schedule_offline')}
-              />
-            </NSpace>
-          </NCheckboxGroup>
-        </div>
-        <div class={styles.filterGroup}>
-          <div class={styles.filterLabel}>{t('project.workflow.relation_depth')}</div>
+      <div class={styles.filterBar}>
+        <span class={styles.filterBarTitle}>
+          {t('project.workflow.relation_filters')}
+        </span>
+        <NInput
+          value={props.keyword}
+          clearable
+          size='small'
+          style='width:160px'
+          placeholder={t('project.workflow.workflow_name')}
+          onUpdateValue={(v) => emit('update:keyword', v)}
+        />
+        {props.availableGroups.length > 0 ? (
           <NSelect
             size='small'
-            value={props.depth}
-            options={[
-              { label: t('project.workflow.relation_depth_self'), value: 0 },
-              { label: t('project.workflow.relation_depth_1'), value: 1 },
-              { label: t('project.workflow.relation_depth_2'), value: 2 },
-              { label: t('project.workflow.relation_depth_all'), value: 99 }
-            ]}
-            onUpdateValue={(v) => emit('update:depth', v)}
+            multiple
+            maxTagCount={1}
+            style='min-width:140px;max-width:220px'
+            placeholder={t('project.workflow.relation_biz_group')}
+            value={props.groups}
+            options={props.availableGroups.map((g) => ({ label: g, value: g }))}
+            onUpdateValue={(v: string[]) => emit('update:groups', v || [])}
           />
-        </div>
-        <div class={styles.filterGroup}>
-          <NCheckbox
-            checked={props.onlyIsolated}
-            onUpdateChecked={(v) => emit('update:onlyIsolated', v)}
-          >
-            {t('project.workflow.relation_only_isolated')}
-          </NCheckbox>
-        </div>
+        ) : null}
+        <NSelect
+          size='small'
+          multiple
+          maxTagCount={1}
+          style='min-width:140px;max-width:220px'
+          placeholder={t('project.workflow.relation_publish_status')}
+          value={props.status}
+          options={[
+            { label: t('project.workflow.online'), value: 'online' },
+            {
+              label: t('project.workflow.workflow_offline'),
+              value: 'workflow_offline'
+            },
+            {
+              label: t('project.workflow.schedule_offline'),
+              value: 'schedule_offline'
+            }
+          ]}
+          onUpdateValue={(v: string[]) => emit('update:status', v || [])}
+        />
+        <NSelect
+          size='small'
+          style='width:140px'
+          value={props.depth}
+          options={[
+            { label: t('project.workflow.relation_depth_self'), value: 0 },
+            { label: t('project.workflow.relation_depth_1'), value: 1 },
+            { label: t('project.workflow.relation_depth_2'), value: 2 },
+            { label: t('project.workflow.relation_depth_3'), value: 3 },
+            { label: t('project.workflow.relation_depth_all'), value: 99 }
+          ]}
+          onUpdateValue={(v) => emit('update:depth', v)}
+        />
+        <NCheckbox
+          checked={props.onlyIsolated}
+          onUpdateChecked={(v) => emit('update:onlyIsolated', v)}
+        >
+          {t('project.workflow.relation_only_isolated')}
+        </NCheckbox>
+        <NButton size='small' quaternary onClick={() => emit('collapse')}>
+          {t('project.workflow.relation_filter_collapse')}
+        </NButton>
       </div>
     )
   }

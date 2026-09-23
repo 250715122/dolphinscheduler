@@ -126,8 +126,54 @@ const login = defineComponent({
           </div>
           <div
             class={styles['form-model']}
-            v-show={this.loginForm.ssoLoginUrl.length === 0}
+            v-show={
+              this.loginMode === 'chooser' &&
+              this.loginForm.ssoLoginUrl.length !== 0
+            }
           >
+            <a href={this.loginForm.ssoLoginUrl} style='text-decoration:none'>
+              <NButton
+                class='btn-login-sso'
+                round
+                type='info'
+                style={{ width: '100%', marginTop: '12px' }}
+              >
+                {this.t('login.ssoLogin')}
+              </NButton>
+            </a>
+            <NButton
+              class='btn-login-password-option'
+              round
+              secondary
+              type='info'
+              style={{ width: '100%', marginTop: '16px' }}
+              onClick={() => {
+                this.loginMode = 'password'
+              }}
+            >
+              {this.t('login.loginWithPassword')}
+            </NButton>
+          </div>
+          <div
+            class={styles['form-model']}
+            v-show={
+              this.loginMode === 'password' ||
+              this.loginForm.ssoLoginUrl.length === 0
+            }
+          >
+            <NButton
+              text
+              type='info'
+              style={{ marginBottom: '8px' }}
+              v-show={this.loginForm.ssoLoginUrl.length !== 0}
+              onClick={() => {
+                this.loginMode = 'chooser'
+                this.loginForm.userName = ''
+                this.loginForm.userPassword = ''
+              }}
+            >
+              ← {this.t('login.backToOptions')}
+            </NButton>
             <NForm rules={this.rules} ref='loginFormRef'>
               <NFormItem
                 label={this.t('login.userName')}
@@ -173,22 +219,6 @@ const login = defineComponent({
             >
               {this.t('login.login')}
             </NButton>
-          </div>
-          <div
-            class={styles['form-model']}
-            v-show={this.loginForm.ssoLoginUrl.length !== 0}
-          >
-            <a href={this.loginForm.ssoLoginUrl} style='text-decoration:none'>
-              <NButton
-                class='btn-login-sso'
-                round
-                type='info'
-                style={{ width: '100%', marginTop: '30px' }}
-                onClick={this.handleLogin}
-              >
-                {this.t('login.ssoLogin')}
-              </NButton>
-            </a>
           </div>
           {(this.oauth2Providers.length > 0 ||
             this.oidcProviders.length > 0) && (

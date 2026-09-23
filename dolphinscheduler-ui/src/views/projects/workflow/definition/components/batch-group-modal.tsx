@@ -13,6 +13,7 @@ import {
   updateProjectPreference
 } from '@/service/modules/projects-preference'
 import type { WorkflowGroupOverrides } from '@/views/projects/workflow/common/workflow-group'
+import { upsertBizGroup } from '@/views/projects/workflow/common/workflow-group'
 
 const BatchGroupModal = defineComponent({
   name: 'BatchGroupModal',
@@ -93,6 +94,10 @@ const BatchGroupModal = defineComponent({
           overrides[String(c)] = name
         })
         pref.workflowGroupOverrides = overrides
+        pref.workflowBizGroups = upsertBizGroup(
+          pref.workflowBizGroups || [],
+          name
+        )
         await updateProjectPreference(
           {
             projectPreferences: JSON.stringify(pref),

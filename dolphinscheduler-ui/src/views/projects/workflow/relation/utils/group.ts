@@ -31,3 +31,23 @@ export function collectPrefixes(names: string[]): string[] {
   names.forEach((n) => set.add(extractPrefix(n)))
   return Array.from(set).sort()
 }
+
+
+/** Soft fill for node cards; keep group hue without loud saturation. */
+export function pastelOf(hex: string): string {
+  const h = (hex || '#64748b').replace('#', '')
+  if (h.length !== 6) return 'rgba(100,116,139,0.12)'
+  const r = parseInt(h.slice(0, 2), 16)
+  const g = parseInt(h.slice(2, 4), 16)
+  const b = parseInt(h.slice(4, 6), 16)
+  return `rgba(${r},${g},${b},0.14)`
+}
+
+export type RunPublishCategory = 0 | 1 | 2
+
+/** 0 online, 1 workflow offline, 2 schedule offline */
+export function statusAccent(cat: RunPublishCategory): string {
+  if (cat === 1) return '#dc2626'
+  if (cat === 2) return '#ea580c'
+  return '#16a34a'
+}

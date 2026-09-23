@@ -45,4 +45,6 @@ public interface WorkflowTaskLineageMapper extends BaseMapper<WorkflowTaskLineag
 
     List<WorkflowTaskLineage> queryByWorkflowDefinitionCode(@Param("workflowDefinitionCode") long workflowDefinitionCode);
 
+    List<WorkflowTaskLineage> queryDownstreamByProjectCode(@Param("projectCode") long projectCode);
+
 }

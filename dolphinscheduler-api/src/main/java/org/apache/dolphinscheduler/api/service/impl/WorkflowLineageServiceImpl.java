@@ -118,7 +118,9 @@ public class WorkflowLineageServiceImpl extends BaseServiceImpl implements Workf
         if (project == null) {
             throw new ServiceException(Status.PROJECT_NOT_FOUND, projectCode);
         }
-        List<WorkflowTaskLineage> workflowTaskLineageList = workflowTaskLineageDao.queryByProjectCode(projectCode);
+        List<WorkflowTaskLineage> workflowTaskLineageList = new ArrayList<>(workflowTaskLineageDao.queryByProjectCode(projectCode));
+        // include workflows in other projects that depend on this project's workflows (cross-project downstream)
+        workflowTaskLineageList.addAll(workflowTaskLineageDao.queryDownstreamByProjectCode(projectCode));
         List<WorkFlowRelation> workFlowRelationList = getWorkFlowRelations(workflowTaskLineageList);
         List<WorkFlowRelationDetail> workFlowRelationDetailList =
                 getWorkflowRelationDetails(workflowTaskLineageList.stream()

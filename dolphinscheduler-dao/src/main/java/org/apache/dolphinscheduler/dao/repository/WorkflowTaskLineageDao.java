@@ -42,4 +42,6 @@ public interface WorkflowTaskLineageDao extends IDao<WorkflowTaskLineage> {
     List<WorkflowTaskLineage> queryByWorkflowDefinitionCode(long workflowDefinitionCode);
 
     int updateWorkflowTaskLineage(List<WorkflowTaskLineage> workflowTaskLineages);
+
+    List<WorkflowTaskLineage> queryDownstreamByProjectCode(long projectCode);
 }

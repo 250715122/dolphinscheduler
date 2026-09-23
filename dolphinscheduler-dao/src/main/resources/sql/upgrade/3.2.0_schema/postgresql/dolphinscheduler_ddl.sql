@@ -53,7 +53,7 @@ CREATE TABLE if not exists "t_ds_project_preference" (
     "id" int NOT NULL,
     "code" bigint NOT NULL,
     "project_code" bigint NOT NULL,
-    "preferences" VARCHAR(512) NOT NULL,
+    "preferences" text NOT NULL,
     "user_id" integer NULL,
     "state" integer NULL DEFAULT 1,
     "create_time" timestamp NULL DEFAULT CURRENT_TIMESTAMP,

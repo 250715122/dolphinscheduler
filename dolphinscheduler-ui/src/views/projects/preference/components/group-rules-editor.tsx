@@ -1,14 +1,24 @@
-import { defineComponent, PropType } from 'vue'
-import { NButton, NInput, NSpace, NDataTable, NTag } from 'naive-ui'
+import { defineComponent, PropType, computed } from 'vue'
+import { NButton, NInput, NSpace, NDataTable, NTag, NSelect } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
-import type { WorkflowGroupRule } from '@/views/projects/workflow/common/workflow-group'
-import { DEFAULT_GROUP_RULES } from '@/views/projects/workflow/common/workflow-group'
+import type {
+  WorkflowBizGroup,
+  WorkflowGroupRule
+} from '@/views/projects/workflow/common/workflow-group'
+import {
+  DEFAULT_GROUP_RULES,
+  groupColor
+} from '@/views/projects/workflow/common/workflow-group'
 
 const GroupRulesEditor = defineComponent({
   name: 'GroupRulesEditor',
   props: {
     value: {
       type: Array as PropType<WorkflowGroupRule[]>,
+      default: () => []
+    },
+    groups: {
+      type: Array as PropType<WorkflowBizGroup[]>,
       default: () => []
     },
     disabled: {
@@ -20,12 +30,20 @@ const GroupRulesEditor = defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n()
 
-    const update = (next: WorkflowGroupRule[]) => {
-      emit('update:value', next)
-    }
+    const groupOptions = computed(() =>
+      (props.groups || [])
+        .filter((g) => String(g.name || '').trim())
+        .map((g) => ({
+          label: g.name,
+          value: g.name
+        }))
+    )
+
+    const update = (next: WorkflowGroupRule[]) => emit('update:value', next)
 
     const addRow = () => {
-      update([...(props.value || []), { group: '', pattern: '' }])
+      const first = groupOptions.value[0]?.value || ''
+      update([...(props.value || []), { group: first, pattern: '' }])
     }
 
     const removeRow = (idx: number) => {
@@ -34,7 +52,11 @@ const GroupRulesEditor = defineComponent({
       update(next)
     }
 
-    const patch = (idx: number, key: 'group' | 'pattern', val: string) => {
+    const patch = (
+      idx: number,
+      key: 'group' | 'pattern',
+      val: string
+    ) => {
       const next = [...(props.value || [])].map((r, i) =>
         i === idx ? { ...r, [key]: val } : r
       )
@@ -54,13 +76,29 @@ const GroupRulesEditor = defineComponent({
           {t('project.preference.group_manual_hint')}
         </div>
         <NSpace style='margin-bottom: 10px'>
-          <NButton size='small' disabled={props.disabled} onClick={addRow}>
+          <NButton
+            size='small'
+            disabled={props.disabled || groupOptions.value.length === 0}
+            onClick={addRow}
+          >
             {t('project.preference.group_rule_add')}
           </NButton>
-          <NButton size='small' secondary disabled={props.disabled} onClick={loadDefaults}>
+          <NButton
+            size='small'
+            secondary
+            disabled={props.disabled}
+            onClick={loadDefaults}
+          >
             {t('project.preference.group_rule_defaults')}
           </NButton>
         </NSpace>
+        {groupOptions.value.length === 0 && (
+          <div style='margin-bottom: 8px'>
+            <NTag size='small' type='warning'>
+              {t('project.preference.group_rules_need_catalog')}
+            </NTag>
+          </div>
+        )}
         <NDataTable
           size='small'
           bordered
@@ -68,15 +106,36 @@ const GroupRulesEditor = defineComponent({
           data={(props.value || []).map((r, index) => ({ ...r, index }))}
           columns={[
             {
+              title: t('project.preference.group_color'),
+              key: 'color',
+              width: 56,
+              render: (row: any) => (
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '4px',
+                    background: groupColor(row.group || 'other', props.groups),
+                    verticalAlign: 'middle'
+                  }}
+                />
+              )
+            },
+            {
               title: t('project.preference.group_name'),
               key: 'group',
+              width: 180,
               render: (row: any) => (
-                <NInput
+                <NSelect
                   size='small'
-                  value={row.group}
+                  filterable
+                  tag={false}
+                  value={row.group || null}
+                  options={groupOptions.value}
                   disabled={props.disabled}
-                  placeholder='采集'
-                  onUpdateValue={(v) => patch(row.index, 'group', v)}
+                  placeholder={t('project.preference.group_name')}
+                  onUpdateValue={(v: string) => patch(row.index, 'group', v || '')}
                 />
               )
             },

@@ -70,7 +70,17 @@ public abstract class AbstractAuthenticator implements Authenticator {
         Result<Map<String, String>> result = new Result<>();
         User user = login(userName, password);
         if (user == null) {
-            if (Objects.equals(securityConfig.getType(), AuthenticationType.CASDOOR_SSO.name())) {
+            // CASDOOR_SSO dual-login: UUID userName means SSO callback; otherwise native password
+            boolean ssoCallback = Objects.equals(securityConfig.getType(), AuthenticationType.CASDOOR_SSO.name())
+                    && userName != null && userName.length() == 36;
+            if (ssoCallback) {
+                try {
+                    java.util.UUID.fromString(userName);
+                } catch (IllegalArgumentException ex) {
+                    ssoCallback = false;
+                }
+            }
+            if (ssoCallback) {
                 log.error("State or code entered incorrectly.");
                 result.setCode(Status.STATE_CODE_ERROR.getCode());
                 result.setMsg(Status.STATE_CODE_ERROR.getMsg());

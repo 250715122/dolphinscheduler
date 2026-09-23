@@ -94,4 +94,9 @@ public class WorkflowTaskLineageDaoImpl extends BaseDao<WorkflowTaskLineage, Wor
                         .distinct().collect(Collectors.toList()));
         return mybatisMapper.batchInsert(workflowTaskLineages);
     }
+
+    @Override
+    public List<WorkflowTaskLineage> queryDownstreamByProjectCode(long projectCode) {
+        return mybatisMapper.queryDownstreamByProjectCode(projectCode);
+    }
 }

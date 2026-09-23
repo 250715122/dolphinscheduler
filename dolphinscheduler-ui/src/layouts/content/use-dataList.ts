@@ -85,22 +85,15 @@ export function useDataList() {
   })
 
   const changeMenuOption = (state: any) => {
-    const projectCode = route.params.projectCode || ''
-    const projectName = route.query.projectName || ''
-    state.menuOptions = [
-      {
-        label: () => h(NEllipsis, null, { default: () => t('menu.home') }),
-        key: 'home',
-        icon: renderIcon(HomeOutlined)
-      },
-      {
-        label: () => h(NEllipsis, null, { default: () => t('menu.project') }),
-        key: 'projects',
-        icon: renderIcon(ProfileOutlined),
-        children: [
+    const projectCode = String(route.params.projectCode || '').trim()
+    const projectName = String(route.query.projectName || '').trim()
+    const hasProject = !!projectCode && projectCode !== 'undefined' && projectCode !== 'null'
+
+    const projectScopedChildren = hasProject
+      ? [
           {
             label: t('menu.project') + (projectName ? `[${projectName}]` : ''),
-            key: `/projects/${projectCode}`,
+            key: `/projects/${projectCode}/workflow/relation`,
             icon: renderIcon(FundProjectionScreenOutlined),
             payload: { projectName: projectName },
             children: [
@@ -161,6 +154,25 @@ export function useDataList() {
             ]
           }
         ]
+      : [
+          {
+            label: t('menu.project_list'),
+            key: '/projects/list',
+            icon: renderIcon(ProfileOutlined)
+          }
+        ]
+
+    state.menuOptions = [
+      {
+        label: () => h(NEllipsis, null, { default: () => t('menu.home') }),
+        key: 'home',
+        icon: renderIcon(HomeOutlined)
+      },
+      {
+        label: () => h(NEllipsis, null, { default: () => t('menu.project') }),
+        key: 'projects',
+        icon: renderIcon(ProfileOutlined),
+        children: projectScopedChildren
       },
       {
         label: () => h(NEllipsis, null, { default: () => t('menu.resources') }),

@@ -22,6 +22,10 @@ export default {
   number: '数量',
   state: '状态',
 
+  ops_project_title: '{name} · 项目运营看板',
+  ops_project_fallback: '当前项目',
+  ops_project_locked: '当前项目',
+  ops_no_project_access: '当前账号无权查看该项目数据',
   ops_title: '运行总览',
   ops_subtitle: '查看执行表现，优先处理异常。',
   ops_updated_at: '数据更新于',

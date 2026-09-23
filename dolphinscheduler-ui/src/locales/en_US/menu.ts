@@ -19,6 +19,7 @@ export default {
   collapse_sidebar: 'Collapse sidebar',
   expand_sidebar: 'Expand sidebar',
   home: 'Home',
+  project_list: 'Project List',
   project: 'Project',
   resources: 'Resources',
   datasource: 'Datasource',

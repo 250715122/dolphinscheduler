@@ -22,6 +22,10 @@ export default {
   number: 'Number',
   state: 'State',
 
+  ops_project_title: '{name} · Project ops',
+  ops_project_fallback: 'Current project',
+  ops_project_locked: 'Project',
+  ops_no_project_access: 'You are not authorized to view this project',
   ops_title: 'Operations Overview',
   ops_subtitle: 'Review execution health and prioritize exceptions.',
   ops_updated_at: 'Updated at',

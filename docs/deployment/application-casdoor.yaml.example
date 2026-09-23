@@ -1,0 +1,19 @@
+# Copy relevant keys into api-server/conf/application.yaml on the target host.
+# Do NOT commit real client-secret / DB password.
+security:
+  authentication:
+    type: CASDOOR_SSO
+    casdoor:
+      user:
+        admin: admin
+
+casdoor:
+  endpoint: https://agi-casdoor.bluetti.com
+  client-id: "<from Casdoor application_dolphinscheduler>"
+  client-secret: "<from Casdoor>"
+  certificate: |-
+    <paste cert-built-in PEM>
+  organization-name: organization_poweroak
+  application-name: application_dolphinscheduler
+  # Must match a Casdoor redirect URI
+  redirect-url: http://192.168.40.39:12345/dolphinscheduler/ui/login

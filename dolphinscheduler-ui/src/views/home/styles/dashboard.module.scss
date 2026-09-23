@@ -27,6 +27,53 @@
   overflow: hidden;
 }
 
+.pageDark {
+  --ops-bg: #101014;
+  --ops-surface: #1b1b21;
+  --ops-text: #e8eaed;
+  --ops-text-secondary: #aeb4bf;
+  --ops-text-muted: #8b93a1;
+  --ops-border: #2e3138;
+  --ops-primary: #3b82f6;
+  --ops-success: #22c55e;
+  --ops-danger: #f87171;
+  --ops-warning: #fbbf24;
+  --ops-manual: #a78bfa;
+  --ops-neutral: #94a3b8;
+  color: var(--ops-text);
+  background: var(--ops-bg);
+}
+
+.pageDark .metricCard,
+.pageDark .card,
+.pageDark .headerFilters,
+.pageDark .trendMiniCard,
+.pageDark .fixedPanel {
+  background: var(--ops-surface);
+  border-color: var(--ops-border);
+}
+
+.pageDark .title,
+.pageDark .cardTitle,
+.pageDark .metricLabel,
+.pageDark .metricValue,
+.pageDark .trendMiniTitle {
+  color: var(--ops-text);
+}
+
+.pageDark .subtitle,
+.pageDark .cardDesc,
+.pageDark .metricHint,
+.pageDark .panelMeta,
+.pageDark .emptyHint,
+.pageDark .headerMeta {
+  color: var(--ops-text-muted);
+}
+
+.pageDark .linkBtn {
+  color: var(--ops-primary);
+}
+
 .header {
   display: flex;
   flex-direction: column;

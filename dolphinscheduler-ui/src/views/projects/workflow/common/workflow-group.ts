@@ -1,12 +1,21 @@
 import { extractPrefix, prefixColor } from '../relation/utils/group'
 
+export interface WorkflowBizGroup {
+  /** stable id within project preference */
+  id: string
+  name: string
+  color: string
+  description?: string
+}
+
 export interface WorkflowGroupRule {
+  /** references WorkflowBizGroup.name (or free text for legacy) */
   group: string
   /** RegExp source or plain prefix; matched against workflow name */
   pattern: string
 }
 
-export type GroupSource = 'manual' | 'rule' | 'prefix'
+export type GroupSource = 'manual' | 'rule' | 'none'
 
 export interface ResolvedGroup {
   name: string
@@ -57,6 +66,18 @@ export function matchGroupByRules(
   return null
 }
 
+export const UNGROUPED: ResolvedGroup = {
+  name: '',
+  color: '#94a3b8',
+  source: 'none'
+}
+
+/**
+ * Resolve group for a workflow.
+ * Priority: manual/custom (preference override or [group:xx]) >
+ *   auto-match rules (only when autoMatch=true) >
+ *   ungrouped.
+ */
 export function resolveWorkflowGroup(
   workflow: {
     name?: string
@@ -65,26 +86,38 @@ export function resolveWorkflowGroup(
     code?: string | number
   },
   rules?: WorkflowGroupRule[] | null,
-  overrides?: WorkflowGroupOverrides | null
+  overrides?: WorkflowGroupOverrides | null,
+  catalog?: WorkflowBizGroup[] | null,
+  autoMatch: boolean = true
 ): ResolvedGroup {
   const codeKey = workflow.code != null ? String(workflow.code) : ''
   if (overrides && codeKey && overrides[codeKey]) {
     const ov = String(overrides[codeKey]).trim()
     if (ov) {
-      return { name: ov, color: prefixColor(ov), source: 'manual' }
+      return { name: ov, color: groupColor(ov, catalog), source: 'manual' }
     }
   }
   const name = String(workflow.name || workflow.workFlowName || '')
   const manual = parseGroupFromDescription(workflow.description)
   if (manual) {
-    return { name: manual, color: prefixColor(manual), source: 'manual' }
+    return {
+      name: manual,
+      color: groupColor(manual, catalog),
+      source: 'manual'
+    }
+  }
+  if (!autoMatch) {
+    return { ...UNGROUPED }
   }
   const byRule = matchGroupByRules(name, rules)
   if (byRule) {
-    return { name: byRule, color: prefixColor(byRule), source: 'rule' }
+    return {
+      name: byRule,
+      color: groupColor(byRule, catalog),
+      source: 'rule'
+    }
   }
-  const prefix = extractPrefix(name)
-  return { name: prefix, color: prefixColor(prefix), source: 'prefix' }
+  return { ...UNGROUPED }
 }
 
 
@@ -119,10 +152,21 @@ export function collectGroups(
     code?: string | number
   }>,
   rules?: WorkflowGroupRule[] | null,
-  overrides?: WorkflowGroupOverrides | null
+  overrides?: WorkflowGroupOverrides | null,
+  catalog?: WorkflowBizGroup[] | null,
+  autoMatch: boolean = true
 ): string[] {
   const set = new Set<string>()
-  items.forEach((w) => set.add(resolveWorkflowGroup(w, rules, overrides).name))
+  items.forEach((w) => {
+    const n = resolveWorkflowGroup(w, rules, overrides, catalog, autoMatch).name
+    if (n) set.add(n)
+  })
+  if (catalog?.length) {
+    catalog.forEach((g) => {
+      const n = String(g.name || '').trim()
+      if (n) set.add(n)
+    })
+  }
   if (overrides) {
     Object.values(overrides).forEach((g) => {
       const n = String(g || '').trim()
@@ -138,8 +182,80 @@ export function collectGroups(
   return Array.from(set).sort((a, b) => a.localeCompare(b))
 }
 
-export function groupColor(groupName: string): string {
-  return prefixColor(groupName)
+/** Fixed palette for biz-group picker (8 categories). */
+export const BIZ_GROUP_COLORS = [
+  '#2563eb', // 蓝
+  '#0d9488', // 青
+  '#ea580c', // 橙
+  '#7c3aed', // 紫
+  '#db2777', // 粉
+  '#65a30d', // 绿
+  '#ca8a04', // 黄
+  '#dc2626' // 红
+] as const
+
+export function groupColor(
+  groupName: string,
+  catalog?: WorkflowBizGroup[] | null
+): string {
+  const n = String(groupName || '').trim()
+  if (catalog?.length && n) {
+    const hit = catalog.find((g) => String(g.name || '').trim() === n)
+    if (hit?.color) return hit.color
+  }
+  return prefixColor(n || 'other')
+}
+
+export function newBizGroupId(): string {
+  return `g_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
+}
+
+
+/** Ensure a named group exists in catalog; returns updated list (new array). */
+export function upsertBizGroup(
+  catalog: WorkflowBizGroup[] | null | undefined,
+  name: string,
+  color?: string,
+  description?: string
+): WorkflowBizGroup[] {
+  const n = String(name || '').trim()
+  const list = [...(catalog || [])]
+  if (!n) return list
+  const idx = list.findIndex(
+    (g) => String(g.name || '').trim().toLowerCase() === n.toLowerCase()
+  )
+  if (idx >= 0) {
+    const prev = list[idx]
+    list[idx] = {
+      ...prev,
+      name: n,
+      color: color || prev.color || prefixColor(n),
+      description:
+        description !== undefined ? description : prev.description || ''
+    }
+    return list
+  }
+  list.push({
+    id: newBizGroupId(),
+    name: n,
+    color: color || prefixColor(n),
+    description: description || ''
+  })
+  return list
+}
+
+/** Merge many group names into catalog (keep existing colors/ids). */
+export function mergeBizGroupNames(
+  catalog: WorkflowBizGroup[] | null | undefined,
+  names: Array<string | null | undefined>
+): WorkflowBizGroup[] {
+  let list = [...(catalog || [])]
+  for (const raw of names) {
+    const n = String(raw || '').trim()
+    if (!n) continue
+    list = upsertBizGroup(list, n)
+  }
+  return list
 }
 
 export const DEFAULT_GROUP_RULES: WorkflowGroupRule[] = [
@@ -150,6 +266,24 @@ export const DEFAULT_GROUP_RULES: WorkflowGroupRule[] = [
   { group: '旁路', pattern: '^(sync_|alert_|ods_|ads_)' },
   { group: '运维', pattern: '^(manual_|retired_|paused_|experiment_|orphan_|legacy_)' }
 ]
+
+/** Seed catalog from default rule group names */
+export function defaultBizGroups(): WorkflowBizGroup[] {
+  const seen = new Set<string>()
+  const out: WorkflowBizGroup[] = []
+  for (const r of DEFAULT_GROUP_RULES) {
+    const name = String(r.group || '').trim()
+    if (!name || seen.has(name)) continue
+    seen.add(name)
+    out.push({
+      id: newBizGroupId(),
+      name,
+      color: prefixColor(name),
+      description: ''
+    })
+  }
+  return out
+}
 
 /** Persist / clear a code→group override in project preference JSON */
 export async function syncWorkflowGroupOverride(

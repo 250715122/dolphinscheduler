@@ -29,6 +29,8 @@ export function useForm() {
       userPassword: '',
       ssoLoginUrl: ''
     },
+    // chooser: pick SSO vs password; password: show native form
+    loginMode: 'chooser' as 'chooser' | 'password',
     rules: {
       userName: {
         trigger: ['input', 'blur'],

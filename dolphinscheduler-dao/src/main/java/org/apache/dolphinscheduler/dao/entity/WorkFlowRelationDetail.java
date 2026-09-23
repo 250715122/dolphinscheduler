@@ -26,6 +26,8 @@ public class WorkFlowRelationDetail {
 
     private long workFlowCode;
     private String workFlowName;
+    private long projectCode;
+    private String projectName;
     private String workFlowPublishStatus;
     private Date scheduleStartTime;
     private Date scheduleEndTime;

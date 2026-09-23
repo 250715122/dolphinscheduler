@@ -269,8 +269,17 @@ public class AlertDao {
                 .warnLevel(AlertWarnLevel.MIDDLE)
                 .build();
         workflowAlertContentList.add(workflowAlertContent);
-        String content = JSONUtils.toJsonString(workflowAlertContentList);
-        alert.setTitle("Task Timeout Warn");
+        String readable = String.format(
+                "【告警类型】任务超时\n【项目】%s\n【工作流实例】%s\n【实例ID】%s\n【任务】%s\n【任务类型】%s\n【任务主机】%s",
+                projectUser.getProjectName(),
+                workflowInstance.getName(),
+                workflowInstance.getId(),
+                taskInstance.getName(),
+                taskInstance.getTaskType(),
+                taskInstance.getHost());
+        String content = readable;
+        alert.setTitle(String.format("【任务超时】%s / %s / %s",
+                projectUser.getProjectName(), workflowInstance.getName(), taskInstance.getName()));
         alert.setProjectCode(projectUser.getProjectCode());
         alert.setWorkflowDefinitionCode(workflowInstance.getWorkflowDefinitionCode());
         alert.setWorkflowInstanceId(workflowInstance.getId());

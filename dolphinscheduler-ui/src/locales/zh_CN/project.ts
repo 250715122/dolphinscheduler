@@ -119,7 +119,7 @@ export default {
     relation_metric_edges: '依赖',
     relation_metric_isolated: '孤立',
     relation_lane_hint: '泳道按依赖深度：上游 L0 → 下游 Ln',
-    relation_timeline_hint: '按依赖层级与调度时刻排列的一日时间线；有 crontab 的工作流按实际时刻落点，点击行可联动详情与上下游。',
+    relation_timeline_hint: '按依赖层级排列的一日时间线：每天多次 / 每小时 / 固定时刻会展开为多个触发点；高频调度显示为条带。无 crontab 不落点。点击行联动详情。',
     create_workflow: '创建工作流',
     create_workflow_dynamic: '创建工作流 (动态)',
     workflow_name: '工作流名称',

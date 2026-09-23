@@ -65,13 +65,20 @@ const DurationRank = defineComponent({
                 {
                   title: t('home.ops_col_project'),
                   key: 'projectName',
-                  width: 100,
+                  width: 90,
                   ellipsis: { tooltip: true }
+                },
+                {
+                  title: t('home.ops_col_run_time'),
+                  key: 'startTime',
+                  width: 148,
+                  ellipsis: { tooltip: true },
+                  render: (row: InstanceRow) => row.startTime || '—'
                 },
                 {
                   title: t('home.ops_col_duration'),
                   key: 'duration',
-                  width: 90,
+                  width: 84,
                   render: (row: InstanceRow) =>
                     row.duration || formatDurationSec(row.durationSec || 0)
                 },

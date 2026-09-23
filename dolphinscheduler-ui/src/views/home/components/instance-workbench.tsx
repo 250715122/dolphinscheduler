@@ -94,12 +94,18 @@ const InstanceWorkbench = defineComponent({
                     )
                 },
                 {
+                  title: t('home.ops_col_time'),
+                  key: 'startTime',
+                  width: 150,
+                  ellipsis: { tooltip: true },
+                  render: (row: InstanceRow) => row.startTime || '—'
+                },
+                {
                   title: t('home.ops_col_duration'),
                   key: 'duration',
-                  width: 110,
+                  width: 90,
                   ellipsis: { tooltip: true },
-                  render: (row: InstanceRow) =>
-                    row.duration || row.endTime || row.startTime || '—'
+                  render: (row: InstanceRow) => row.duration || '—'
                 },
                 {
                   title: t('home.ops_col_action'),

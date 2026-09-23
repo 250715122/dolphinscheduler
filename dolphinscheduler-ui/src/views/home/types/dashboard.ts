@@ -48,6 +48,9 @@ export interface InstanceRow {
   endTime?: string
   duration?: string
   durationSec?: number
+  /** TASK vs WORKFLOW — used by openInstance navigation */
+  entityType?: 'TASK' | 'WORKFLOW'
+  workflowInstanceId?: number
 }
 
 export interface ScheduleRow {
@@ -57,6 +60,8 @@ export interface ScheduleRow {
   crontab?: string
   workflowDefinitionCode?: number
   projectCode?: number
+  /** next fire epoch ms for sorting */
+  sortMs?: number
 }
 
 export interface ServiceSummaryModel {

@@ -44,6 +44,7 @@ import {
   type DisplayGroup
 } from '../adapters/status-groups'
 import { durationToSeconds } from '../adapters/duration'
+import { formatNextFireDisplay } from '../adapters/cron-next'
 import type {
   DashboardScope,
   InstanceRow,
@@ -474,7 +475,8 @@ export function useDashboard(options: DashboardOptions = {}) {
               startTime: item.startTime,
               endTime: item.endTime,
               duration: item.duration,
-              durationSec: durationToSeconds(item.duration)
+              durationSec: durationToSeconds(item.duration),
+              entityType: 'WORKFLOW'
             })
           })
         } else {
@@ -507,7 +509,9 @@ export function useDashboard(options: DashboardOptions = {}) {
                 startTime: item.startTime,
                 endTime: item.endTime,
                 duration: item.duration,
-                durationSec: durationToSeconds(item.duration)
+                durationSec: durationToSeconds(item.duration),
+                entityType: 'TASK',
+                workflowInstanceId: item.workflowInstanceId
               })
             })
           }
@@ -545,8 +549,10 @@ export function useDashboard(options: DashboardOptions = {}) {
           ) {
             return
           }
+          const fire = formatNextFireDisplay(item.crontab)
           rows.push({
-            time: (item.startTime || '').slice(11, 16) || '--:--',
+            time: fire.display,
+            // carry sort key via unused field on object (extended at runtime)
             name:
               item.workflowDefinitionName ||
               item.processDefinitionName ||
@@ -554,13 +560,17 @@ export function useDashboard(options: DashboardOptions = {}) {
             projectName: project.label,
             crontab: item.crontab,
             workflowDefinitionCode: item.workflowDefinitionCode,
-            projectCode: project.value
+            projectCode: project.value,
+            sortMs: fire.sortMs
           })
         })
       } catch (e) {
         /* ignore */
       }
     }
+    rows.sort(
+      (a: any, b: any) => (a.sortMs || 0) - (b.sortMs || 0)
+    )
     scheduleAll.value = rows.slice(0, 60)
     schedulePage.value = 1
   }
@@ -689,7 +699,9 @@ export function useDashboard(options: DashboardOptions = {}) {
               startTime: item.startTime,
               endTime: item.endTime,
               duration: item.duration,
-              durationSec: sec
+              durationSec: sec,
+              entityType: 'TASK',
+              workflowInstanceId: item.workflowInstanceId
             })
           })
         } catch (e) {
@@ -749,17 +761,29 @@ export function useDashboard(options: DashboardOptions = {}) {
   }
 
   const openInstance = (row: InstanceRow) => {
-    if (scope.entityType === 'WORKFLOW' || workbenchTab.value === 'workflow') {
+    const entity =
+      row.entityType ||
+      (scope.entityType === 'WORKFLOW' || workbenchTab.value === 'workflow'
+        ? 'WORKFLOW'
+        : 'TASK')
+    if (entity === 'WORKFLOW') {
       router.push({
         path: `/projects/${row.projectCode}/workflow/instances/${row.id}`,
         query: { projectName: row.projectName }
       })
-    } else {
-      router.push({
-        path: `/projects/${row.projectCode}/task/instances`,
-        query: { projectName: row.projectName }
-      })
+      return
     }
+    const query: Record<string, string> = {
+      projectName: row.projectName
+    }
+    if (row.name) query.taskName = row.name
+    if (row.workflowInstanceId) {
+      query.workflowInstanceId = String(row.workflowInstanceId)
+    }
+    router.push({
+      path: `/projects/${row.projectCode}/task/instances`,
+      query
+    })
   }
 
   const openMonitor = () => {

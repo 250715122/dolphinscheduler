@@ -1,10 +1,16 @@
 import { defineComponent, PropType, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { RelationNode, RelationLink } from '../utils/layout'
-import { crontabToDayWindow, minutesToPct } from '../utils/schedule'
+import {
+  crontabToDaySchedule,
+  minutesToPct,
+  type DayFire
+} from '../utils/schedule'
 import styles from '../styles/relation.module.scss'
 
 const HOURS = [0, 3, 6, 9, 12, 15, 18, 21, 24]
+/** below this count: draw each fire as a tick; above: draw a dense band */
+const TICK_LIMIT = 48
 
 const TimelineView = defineComponent({
   name: 'RelationTimelineView',
@@ -43,25 +49,24 @@ const TimelineView = defineComponent({
       const selected =
         props.selectedId != null ? String(props.selectedId) : null
       return [...props.nodes]
-        .map((n, idx) => {
-          const win = crontabToDayWindow(n.crontab)
-          const fallbackStart =
-            ((n.topoLevel ?? 0) * 100 + (idx % 5) * 25) % (22 * 60)
-          const startMin = win?.startMin ?? fallbackStart
-          const durationMin = win?.durationMin ?? 70
+        .map((n) => {
+          const sched = crontabToDaySchedule(n.crontab)
+          const fires: DayFire[] = sched?.fires || []
           const dimmed =
             selected != null &&
             !hl.has(String(n.id)) &&
             String(n.id) !== selected
+          const firstMin = fires.length ? fires[0].startMin : null
           return {
             node: n,
-            startMin,
-            durationMin,
-            endMin: Math.min(24 * 60, startMin + durationMin),
-            cycle: win?.cycle || 'unknown',
-            label: win?.label || t('project.workflow.relation_timeline_no_cron'),
-            hasCron: !!win,
+            fires,
+            cycle: sched?.cycle || 'unknown',
+            summary:
+              sched?.summary ||
+              t('project.workflow.relation_timeline_no_cron'),
+            hasCron: fires.length > 0,
             dimmed,
+            firstMin,
             upstream: upstreamMap.value.get(String(n.id)) || []
           }
         })
@@ -72,7 +77,11 @@ const TimelineView = defineComponent({
           const la = a.node.topoLevel ?? 0
           const lb = b.node.topoLevel ?? 0
           if (la !== lb) return la - lb
-          if (a.startMin !== b.startMin) return a.startMin - b.startMin
+          // scheduled first, earlier first; no-cron last
+          if (a.hasCron !== b.hasCron) return a.hasCron ? -1 : 1
+          const am = a.firstMin ?? 99999
+          const bm = b.firstMin ?? 99999
+          if (am !== bm) return am - bm
           return String(a.node.name).localeCompare(String(b.node.name))
         })
     })
@@ -96,31 +105,41 @@ const TimelineView = defineComponent({
       return list
     })
 
-    const barStyle = (r: (typeof rows.value)[0]) => {
-      const left = minutesToPct(r.startMin)
-      const width = Math.max(1.5, minutesToPct(r.endMin) - left)
+    const markerColor = (r: (typeof rows.value)[0]) => {
       const wp = Number(r.node.workFlowPublishStatus)
       const sp = Number(r.node.schedulePublishStatus)
-      let bg = String(r.node.bizGroupColor || '#64748b')
-      if (wp === 0) bg = '#94a3b8'
-      else if (sp === 0) bg = '#b45309'
+      if (wp === 0) return '#94a3b8'
+      if (sp === 0) return '#b45309'
+      return String(r.node.bizGroupColor || '#64748b')
+    }
+
+    const bandStyle = (r: (typeof rows.value)[0]) => {
+      if (!r.fires.length) return null
+      const left = minutesToPct(r.fires[0].startMin)
+      const right = minutesToPct(r.fires[r.fires.length - 1].startMin)
+      const width = Math.max(2, right - left + 0.4)
       const selected = String(r.node.id) === String(props.selectedId)
       return {
         left: `${left}%`,
         width: `${width}%`,
-        background: bg,
+        background: markerColor(r),
         boxShadow: selected ? '0 0 0 2px #2563eb' : undefined,
-        opacity: r.dimmed ? 0.22 : r.hasCron ? 1 : 0.65
+        opacity: r.dimmed ? 0.22 : 0.85
+      }
+    }
+
+    const tickStyle = (r: (typeof rows.value)[0], fire: DayFire) => {
+      const selected = String(r.node.id) === String(props.selectedId)
+      return {
+        left: `${minutesToPct(fire.startMin)}%`,
+        ['--fire-color' as any]: markerColor(r),
+        boxShadow: selected ? '0 0 0 2px #2563eb' : undefined,
+        opacity: r.dimmed ? 0.22 : 1
       }
     }
 
     return () => (
-      <div class={styles.timelineWrap} onClick={(e: MouseEvent) => {
-        if ((e.target as HTMLElement).classList?.contains(styles.timelineWrap) ||
-            (e.target as HTMLElement).classList?.contains(styles.timelineBody)) {
-          /* blank click handled by parent via toggle on same node */
-        }
-      }}>
+      <div class={styles.timelineWrap}>
         <div class={styles.timelineHint}>
           {t('project.workflow.relation_timeline_hint')}
         </div>
@@ -130,11 +149,15 @@ const TimelineView = defineComponent({
           </div>
           <div class={styles.timelineAxisTrack}>
             {HOURS.map((h) => (
-              <span style={{ left: `${(h / 24) * 100}%` }}>
+              <span
+                class={h === 24 ? styles.axisEnd : undefined}
+                style={{ left: `${(h / 24) * 100}%` }}
+              >
                 {`${String(h).padStart(2, '0')}:00`}
               </span>
             ))}
           </div>
+          <div class={styles.timelineSummaryCol} />
         </div>
         <div class={styles.timelineBody}>
           {sections.value.map((sec) => (
@@ -151,6 +174,7 @@ const TimelineView = defineComponent({
               </div>
               {sec.rows.map((r) => {
                 const selected = String(r.node.id) === String(props.selectedId)
+                const useBand = r.fires.length > TICK_LIMIT
                 return (
                   <div
                     class={[
@@ -180,13 +204,47 @@ const TimelineView = defineComponent({
                           style={{ left: `${(h / 24) * 100}%` }}
                         />
                       ))}
-                      <div
-                        class={styles.bar}
-                        style={barStyle(r)}
-                        title={`${r.label} · ${r.cycle}`}
-                      >
-                        <span class={styles.barLabel}>{r.label}</span>
-                      </div>
+                      {!r.hasCron && (
+                        <span class={styles.noCronHint}>
+                          {t('project.workflow.relation_timeline_no_cron')}
+                        </span>
+                      )}
+                      {r.hasCron && useBand && (
+                        <div
+                          class={[styles.bar, styles.barDense].join(' ')}
+                          style={bandStyle(r) || undefined}
+                          title={`${r.summary} · ${r.node.crontab || ''}`}
+                        >
+                          <span class={styles.barLabel}>{r.summary}</span>
+                        </div>
+                      )}
+                      {r.hasCron &&
+                        !useBand &&
+                        r.fires.map((f) => (
+                          <div
+                            key={f.startMin}
+                            class={styles.fireMark}
+                            style={tickStyle(r, f)}
+                            title={`${f.label} · ${r.summary}`}
+                          >
+                            <span class={styles.fireTime}>{f.label}</span>
+                            <i class={styles.fireTick} />
+                          </div>
+                        ))}
+                    </div>
+                    <div
+                      class={styles.timelineSummaryCol}
+                      title={
+                        r.hasCron && !useBand
+                          ? r.fires.map((f) => f.label).join(', ')
+                          : r.hasCron
+                            ? `${r.summary} · ${r.node.crontab || ''}`
+                            : undefined
+                      }
+                    >
+                      {r.hasCron && !useBand ? (
+                        <span class={styles.fireSummary}>{r.summary}</span>
+                      ) : null}
                     </div>
                   </div>
                 )

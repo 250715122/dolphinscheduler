@@ -119,7 +119,7 @@ export default {
     relation_metric_edges: 'Edges',
     relation_metric_isolated: 'Isolated',
     relation_lane_hint: 'Lanes by dependency depth: upstream L0 → downstream Ln',
-    relation_timeline_hint: 'Day timeline by dependency level and crontab; click a row to focus upstream/downstream.',
+    relation_timeline_hint: 'Day timeline by dependency level. Multiple daily / hourly fires are shown as ticks; high-frequency schedules as a band. No crontab = no marker. Click a row for details.',
     create_workflow: 'Create Workflow',
     create_workflow_dynamic: 'Create Workflow (Dynamic)',
     workflow_name: 'Workflow Name',

@@ -69,6 +69,7 @@ export default {
   ops_metric_risk: '超时风险',
   ops_hint_period: '所选时段',
   ops_hint_snapshot: '当前快照',
+  ops_hint_pending_schedule: '今日已上线调度 · 下一触发仍在当天且未到点',
   ops_hint_period_failure: '所选时段启动 · 当前为失败',
   ops_risk_unconfigured: '未配置超时规则',
   ops_sample_one: '样本 1，暂不判断趋势',

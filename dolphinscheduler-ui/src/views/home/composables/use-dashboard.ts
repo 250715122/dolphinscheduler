@@ -19,6 +19,7 @@ import {
   getTime,
   startOfDay,
   startOfToday,
+  endOfToday,
   subDays,
   subHours,
   endOfDay
@@ -166,6 +167,8 @@ export function useDashboard(options: DashboardOptions = {}) {
   const qualityPage = ref(1)
   const qualityPageSize = 8
   const qualityFailCount = ref(0)
+  /** Online schedules whose next fire is later today (not yet due). */
+  const pendingScheduleCount = ref(0)
 
   let timer: number | undefined
   let requestSeq = 0
@@ -224,11 +227,9 @@ export function useDashboard(options: DashboardOptions = {}) {
       {
         key: 'waiting',
         label: t('home.ops_metric_pending_count'),
-        value: taskSnapshotGroups.value.waiting,
-        hint: t('home.ops_hint_snapshot'),
-        tone: 'warning',
-        clickTab: 'waiting',
-        entityType: 'TASK'
+        value: pendingScheduleCount.value,
+        hint: t('home.ops_hint_pending_schedule'),
+        tone: pendingScheduleCount.value > 0 ? 'warning' : 'default'
       },
       {
         key: 'failure',
@@ -409,6 +410,7 @@ export function useDashboard(options: DashboardOptions = {}) {
       todayTotal.value = 0
       periodTotal.value = 0
       workflowDefCount.value = 0
+      pendingScheduleCount.value = 0
       return
     }
 
@@ -554,10 +556,13 @@ export function useDashboard(options: DashboardOptions = {}) {
   const loadSchedules = async () => {
     const list = targetProjects()
     const rows: ScheduleRow[] = []
+    const now = Date.now()
+    const todayEnd = getTime(endOfToday())
+    let pending = 0
     for (const project of list) {
       try {
         const res = await queryScheduleListPaging(
-          { pageNo: 1, pageSize: 50 } as any,
+          { pageNo: 1, pageSize: 100 } as any,
           project.value
         )
         ;(res.totalList || []).forEach((item: any) => {
@@ -568,6 +573,14 @@ export function useDashboard(options: DashboardOptions = {}) {
             return
           }
           const fire = formatNextFireDisplay(item.crontab)
+          if (
+            fire.sortMs != null &&
+            fire.sortMs > now &&
+            fire.sortMs <= todayEnd &&
+            fire.sortMs !== Number.MAX_SAFE_INTEGER
+          ) {
+            pending += 1
+          }
           rows.push({
             time: fire.display,
             // carry sort key via unused field on object (extended at runtime)
@@ -589,10 +602,10 @@ export function useDashboard(options: DashboardOptions = {}) {
     rows.sort(
       (a: any, b: any) => (a.sortMs || 0) - (b.sortMs || 0)
     )
+    pendingScheduleCount.value = pending
     scheduleAll.value = rows.slice(0, 60)
     schedulePage.value = 1
   }
-
   const loadService = async () => {
     if (!isAdmin.value) {
       service.value = {

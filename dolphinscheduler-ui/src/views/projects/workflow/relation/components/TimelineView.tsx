@@ -123,7 +123,7 @@ const TimelineView = defineComponent({
         left: `${left}%`,
         width: `${width}%`,
         background: markerColor(r),
-        boxShadow: selected ? '0 0 0 2px #2563eb' : undefined,
+        boxShadow: selected ? '0 0 0 2px var(--rel-accent, #2563eb)' : undefined,
         opacity: r.dimmed ? 0.22 : 0.85
       }
     }
@@ -133,7 +133,7 @@ const TimelineView = defineComponent({
       return {
         left: `${minutesToPct(fire.startMin)}%`,
         ['--fire-color' as any]: markerColor(r),
-        boxShadow: selected ? '0 0 0 2px #2563eb' : undefined,
+        boxShadow: selected ? '0 0 0 2px var(--rel-accent, #2563eb)' : undefined,
         opacity: r.dimmed ? 0.22 : 1
       }
     }
@@ -168,7 +168,7 @@ const TimelineView = defineComponent({
                   style={{ background: sec.color, marginRight: '6px' }}
                 />
                 <strong>{sec.group}</strong>
-                <span style='color:#94a3b8;margin-left:6px;font-size:11px'>
+                <span class={styles.groupCount}>
                   ({sec.rows.length})
                 </span>
               </div>

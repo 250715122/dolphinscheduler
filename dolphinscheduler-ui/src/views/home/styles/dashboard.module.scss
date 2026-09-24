@@ -147,7 +147,7 @@
 }
 
 .trendBottom {
-  /* trend + quality side by side; equal height band */
+  /* trend + quality; quality width matches duration (3rd col of mainGrid) */
   flex: 0 0 clamp(220px, 26vh, 300px);
   height: clamp(220px, 26vh, 300px);
   min-height: 220px;
@@ -155,7 +155,8 @@
   margin-top: var(--ops-gap);
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(260px, 1fr);
+  /* mainGrid = 1.3fr + 1.02fr + 1fr → trend gets 2.32fr, quality 1fr */
+  grid-template-columns: minmax(0, 2.32fr) minmax(0, 1fr);
   gap: var(--ops-gap);
   align-items: stretch;
 }
@@ -561,7 +562,8 @@
   .trendBottom {
     flex-basis: 200px;
     height: 200px;
-    grid-template-columns: minmax(0, 1.4fr) minmax(220px, 1fr);
+    /* at this breakpoint upcoming|duration are 1fr 1fr — keep quality = duration half */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
   .mainGrid {
     grid-template-columns: 1fr 1fr;

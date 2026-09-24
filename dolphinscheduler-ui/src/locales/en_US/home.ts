@@ -69,6 +69,7 @@ export default {
   ops_metric_risk: 'Timeout risk',
   ops_hint_period: 'Selected period',
   ops_hint_snapshot: 'Current snapshot',
+  ops_hint_pending_schedule: 'Online schedules · next fire later today',
   ops_hint_period_failure: 'Started in period · currently failed',
   ops_risk_unconfigured: 'Timeout rules not configured',
   ops_sample_one: 'Sample size 1, trend unavailable',

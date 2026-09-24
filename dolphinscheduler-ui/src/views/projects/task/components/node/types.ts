@@ -261,6 +261,7 @@ interface IRuleParameters {
 }
 
 interface ITaskParams {
+  checkName?: string
   resourceList?: ISourceItem[]
   mainJar?: ISourceItem
   localParams?: ILocalParam[]

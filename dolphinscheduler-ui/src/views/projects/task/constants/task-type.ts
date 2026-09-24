@@ -19,6 +19,7 @@ export type TaskType =
   | 'SUB_WORKFLOW'
   | 'PROCEDURE'
   | 'SQL'
+  | 'SQL_CHECK'
   | 'SPARK'
   | 'FLINK'
   | 'MR'
@@ -69,6 +70,9 @@ export const TASK_TYPES_MAP = {
   },
   SQL: {
     alias: 'SQL'
+  },
+  SQL_CHECK: {
+    alias: 'SQL_CHECK'
   },
   SPARK: {
     alias: 'SPARK'

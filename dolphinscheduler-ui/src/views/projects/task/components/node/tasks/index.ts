@@ -25,6 +25,7 @@ import { useMr } from './use-mr'
 import { useGrpc } from './use-grpc'
 import { useHttp } from './use-http'
 import { useSql } from './use-sql'
+import { useSqlCheck } from './use-sql-check'
 import { useProcedure } from './use-procedure'
 import { useSqoop } from './use-sqoop'
 import { useSeaTunnel } from './use-sea-tunnel'
@@ -62,6 +63,7 @@ export default {
   GRPC: useGrpc,
   HTTP: useHttp,
   SQL: useSql,
+  SQL_CHECK: useSqlCheck,
   PROCEDURE: useProcedure,
   SQOOP: useSqoop,
   SEATUNNEL: useSeaTunnel,

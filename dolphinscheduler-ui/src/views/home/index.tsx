@@ -31,6 +31,7 @@ import UpcomingSchedules from './components/upcoming-schedules'
 import ServiceSummary from './components/service-summary'
 import TrendPanel from './components/trend-panel'
 import DurationRank from './components/duration-rank'
+import QualityRank from './components/quality-rank'
 import styles from './styles/dashboard.module.scss'
 import { useThemeStore } from '@/store/theme/theme'
 import type { MetricCardModel, TimePreset } from './types/dashboard'
@@ -66,6 +67,11 @@ export default defineComponent({
       durationTotal,
       durationPage,
       durationPageSize,
+      qualityPageRows,
+      qualityTotal,
+      qualityPage,
+      qualityPageSize,
+      qualityFailCount,
       refresh,
       setPreset,
       onMetricClick,
@@ -245,6 +251,18 @@ export default defineComponent({
                 onUpdate:page={(p: number) => (this.durationPage = p)}
                 onOpen={openInstance}
               />
+
+              <QualityRank
+                rows={qualityPageRows}
+                total={qualityTotal}
+                page={qualityPage}
+                pageSize={qualityPageSize}
+                failCount={qualityFailCount}
+                loading={loading}
+                onUpdate:page={(p: number) => (this.qualityPage = p)}
+                onOpen={openInstance}
+              />
+
             </div>
           </div>
 

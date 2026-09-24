@@ -201,6 +201,17 @@ export function formatParams(data: INodeData): {
     }
   }
 
+
+  if (data.taskType === 'SQL_CHECK') {
+    taskParams.type = data.type
+    taskParams.datasource = data.datasource
+    taskParams.sql = data.sql
+    const tp = taskParams as Record<string, unknown>
+    tp.operator = data.operator
+    tp.threshold = data.threshold
+    tp.checkName = (data as any).checkName
+  }
+
   if (data.taskType === 'SQL') {
     taskParams.type = data.type
     taskParams.datasource = data.datasource

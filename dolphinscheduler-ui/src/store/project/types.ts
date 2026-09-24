@@ -25,6 +25,7 @@ type TaskType =
   | 'SUB_WORKFLOW'
   | 'PROCEDURE'
   | 'SQL'
+  | 'SQL_CHECK'
   | 'SPARK'
   | 'FLINK'
   | 'MR'

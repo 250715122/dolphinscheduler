@@ -25,6 +25,7 @@ import {
   PlayCircleOutlined,
   ClockCircleOutlined,
   CopyOutlined,
+  ExportOutlined,
   ApartmentOutlined,
   UploadOutlined,
   ArrowUpOutlined,
@@ -52,6 +53,7 @@ export default defineComponent({
     'releaseWorkflow',
     'releaseScheduler',
     'copyWorkflow',
+    'exportWorkflow',
     'gotoWorkflowTree'
   ],
   setup(props, ctx) {
@@ -83,6 +85,10 @@ export default defineComponent({
       ctx.emit('copyWorkflow')
     }
 
+    const handleExportWorkflow = () => {
+      ctx.emit('exportWorkflow')
+    }
+
     const handleGotoWorkflowTree = () => {
       ctx.emit('gotoWorkflowTree')
     }
@@ -99,6 +105,7 @@ export default defineComponent({
       handleDeleteWorkflow,
       handleReleaseWorkflow,
       handleCopyWorkflow,
+      handleExportWorkflow,
       handleGotoWorkflowTree,
       handleReleaseScheduler,
       ...toRefs(props)
@@ -304,6 +311,24 @@ export default defineComponent({
               >
                 <NIcon>
                   <ApartmentOutlined />
+                </NIcon>
+              </NButton>
+            )
+          }}
+        </NTooltip>
+        <NTooltip trigger={'hover'}>
+          {{
+            default: () => t('project.workflow.export'),
+            trigger: () => (
+              <NButton
+                size='small'
+                type='info'
+                tag='div'
+                circle
+                onClick={this.handleExportWorkflow}
+              >
+                <NIcon>
+                  <ExportOutlined />
                 </NIcon>
               </NButton>
             )

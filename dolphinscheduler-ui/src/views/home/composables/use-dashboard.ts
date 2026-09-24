@@ -162,6 +162,10 @@ export function useDashboard(options: DashboardOptions = {}) {
   const durationRows = ref<InstanceRow[]>([])
   const durationPage = ref(1)
   const durationPageSize = 8
+  const qualityRows = ref<InstanceRow[]>([])
+  const qualityPage = ref(1)
+  const qualityPageSize = 8
+  const qualityFailCount = ref(0)
 
   let timer: number | undefined
   let requestSeq = 0
@@ -236,6 +240,15 @@ export function useDashboard(options: DashboardOptions = {}) {
         entityType: 'TASK'
       },
       {
+        key: 'quality',
+        label: t('home.ops_metric_quality_fail'),
+        value: qualityFailCount.value,
+        hint: t('home.ops_hint_quality'),
+        tone: qualityFailCount.value > 0 ? 'danger' : 'default',
+        entityType: 'TASK',
+        clickTab: 'failure'
+      },
+      {
         key: 'completion',
         label: t('home.ops_metric_completion_rate'),
         value: formatRate(rate.value),
@@ -269,6 +282,11 @@ export function useDashboard(options: DashboardOptions = {}) {
   const durationPageRows = computed(() => {
     const start = (durationPage.value - 1) * durationPageSize
     return durationRows.value.slice(start, start + durationPageSize)
+  })
+  const qualityTotal = computed(() => qualityRows.value.length)
+  const qualityPageRows = computed(() => {
+    const start = (qualityPage.value - 1) * qualityPageSize
+    return qualityRows.value.slice(start, start + qualityPageSize)
   })
 
   const instances = computed(() => {
@@ -721,6 +739,78 @@ export function useDashboard(options: DashboardOptions = {}) {
     durationPage.value = 1
   }
 
+
+  const parseCheckAppLink = (raw?: string) => {
+    if (!raw) return {} as { actual?: number; passed?: boolean }
+    try {
+      const o = JSON.parse(raw)
+      return {
+        actual: typeof o.actual === 'number' ? o.actual : undefined,
+        passed: typeof o.passed === 'boolean' ? o.passed : undefined
+      }
+    } catch {
+      return {}
+    }
+  }
+
+  const loadQualityRank = async () => {
+    const list = targetProjects()
+    const rows: InstanceRow[] = []
+    const start = format(subDays(startOfToday(), 29), 'yyyy-MM-dd HH:mm:ss')
+    const end = format(Date.now(), 'yyyy-MM-dd HH:mm:ss')
+    await Promise.all(
+      list.map(async (project) => {
+        try {
+          const res = await queryTaskListPaging(
+            {
+              pageNo: 1,
+              pageSize: 100,
+              startDate: start,
+              endDate: end
+            } as any,
+            { projectCode: project.value }
+          )
+          ;(res.totalList || []).forEach((item: any) => {
+            if (String(item.taskType || '') !== 'SQL_CHECK') return
+            const parsed = parseCheckAppLink(item.appLink)
+            rows.push({
+              id: item.id,
+              name: item.name || item.taskName,
+              projectCode: project.value,
+              projectName: project.label,
+              state: item.state,
+              group: mapRawState(item.state, 'TASK'),
+              startTime: item.startTime,
+              endTime: item.endTime,
+              duration: item.duration,
+              durationSec: durationToSeconds(item.duration),
+              entityType: 'TASK',
+              workflowInstanceId: item.workflowInstanceId,
+              taskType: item.taskType,
+              appLink: item.appLink,
+              checkActual: parsed.actual,
+              checkPassed: parsed.passed
+            })
+          })
+        } catch (e) {
+          /* ignore */
+        }
+      })
+    )
+    rows.sort((a, b) => parseTimeMs(b.startTime) - parseTimeMs(a.startTime))
+    const seen = new Set<number>()
+    const unique = rows.filter((r) => {
+      if (seen.has(r.id)) return false
+      seen.add(r.id)
+      return true
+    })
+    qualityRows.value = unique.slice(0, 200)
+    qualityFailCount.value = unique.filter(
+      (r) => r.checkPassed === false || r.group === 'failure'
+    ).length
+    qualityPage.value = 1
+  }
+
   const refresh = async () => {
     const seq = ++requestSeq
     loading.value = true
@@ -733,7 +823,7 @@ export function useDashboard(options: DashboardOptions = {}) {
         loadInstances(),
         loadSchedules(),
         loadTrend(),
-        loadDurationRank()
+        loadDurationRank(), loadQualityRank()
       ])
       if (seq !== requestSeq) return
       asOf.value = format(Date.now(), 'HH:mm:ss')
@@ -877,6 +967,11 @@ export function useDashboard(options: DashboardOptions = {}) {
     durationTotal,
     durationPage,
     durationPageSize,
+    qualityPageRows,
+    qualityTotal,
+    qualityPage,
+    qualityPageSize,
+    qualityFailCount,
     refresh,
     setPreset,
     setTab,

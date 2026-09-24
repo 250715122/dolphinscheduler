@@ -23,39 +23,29 @@ import {
   NPagination,
   NSpace,
   NTooltip,
-  NPopconfirm,
-  NSelect,
-  NDatePicker
+  NPopconfirm
 } from 'naive-ui'
 import {
   defineComponent,
   getCurrentInstance,
   onMounted,
   toRefs,
-  watch,
-  ref,
-  computed
+  watch
 } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTable } from './use-table'
 import { useRouter, useRoute } from 'vue-router'
 import { useUISettingStore } from '@/store/ui-setting/ui-setting'
 import Card from '@/components/card'
+import ImportModal from './components/import-modal'
 import StartModal from './components/start-modal'
 import TimingModal from './components/timing-modal'
 import VersionModal from './components/version-modal'
 import CopyModal from './components/copy-modal'
-import BatchGroupModal from './components/batch-group-modal'
 import type { Router } from 'vue-router'
+import Search from '@/components/input-search'
 import DependenciesModal from '@/views/projects/components/dependencies/dependencies-modal'
 import totalCount from '@/utils/tableTotalCount'
-import { queryProjectPreferenceByProjectCode } from '@/service/modules/projects-preference'
-import { queryListPaging } from '@/service/modules/workflow-definition'
-import {
-  collectGroups,
-  resolveWorkflowGroup,
-  stripGroupFromDescription
-} from '@/views/projects/workflow/common/workflow-group'
 
 export default defineComponent({
   name: 'WorkflowDefinitionList',
@@ -70,189 +60,39 @@ export default defineComponent({
       createColumns,
       getTableData,
       batchDeleteWorkflow,
+      batchExportWorkflow,
       batchCopyWorkflow
     } = useTable()
-
-    const batchGroupShowRef = ref(false)
-
-    const filters = ref({
-      bizGroup: null as string | null,
-      name: null as string | null,
-      releaseState: null as string | null,
-      scheduleReleaseState: null as string | null,
-      createTimeRange: null as [number, number] | null,
-      updateTimeRange: null as [number, number] | null,
-      userName: null as string | null,
-      description: null as string | null
-    })
-
-    const filterSource = ref<any[]>([])
-
-    const loadFilterSource = async () => {
-      try {
-        const res: any = await queryListPaging(
-          { pageNo: 1, pageSize: 2000, searchVal: '' },
-          projectCode
-        )
-        filterSource.value = res?.totalList || res?.data?.totalList || []
-      } catch {
-        filterSource.value = []
-      }
-    }
-
-    const loadGroupRules = async () => {
-      try {
-        const result = await queryProjectPreferenceByProjectCode(projectCode)
-        if (result?.preferences) {
-          const pref = JSON.parse(result.preferences)
-          variables.groupRules = pref.workflowGroupRules || []
-          variables.groupOverrides = pref.workflowGroupOverrides || {}
-          variables.groupCatalog = pref.workflowBizGroups || []
-          variables.groupAutoMatch =
-            pref.workflowGroupAutoMatch !== undefined
-              ? !!pref.workflowGroupAutoMatch
-              : true
-        } else {
-          variables.groupRules = []
-          variables.groupOverrides = {}
-          variables.groupCatalog = []
-          variables.groupAutoMatch = true
-        }
-      } catch {
-        variables.groupRules = []
-        variables.groupOverrides = {}
-        variables.groupCatalog = []
-        variables.groupAutoMatch = true
-      }
-    }
-
-    const filterRows = computed(() =>
-      filterSource.value.length ? filterSource.value : variables.tableData || []
-    )
-
-    const availableGroups = computed(() =>
-      collectGroups(
-        filterRows.value.map((r: any) => ({
-          name: r.name,
-          description: r.description,
-          code: r.code
-        })),
-        variables.groupRules,
-        variables.groupOverrides,
-        variables.groupCatalog,
-        variables.groupAutoMatch
-      ).map((g) => ({ label: g, value: g }))
-    )
-
-    const toOptions = (values: string[]) =>
-      Array.from(new Set(values.filter((v) => v && String(v).trim())))
-        .sort((a, b) => a.localeCompare(b))
-        .map((v) => ({ label: v, value: v }))
-
-    const nameOptions = computed(() =>
-      toOptions(filterRows.value.map((r: any) => String(r.name || '')))
-    )
-    const userNameOptions = computed(() =>
-      toOptions(filterRows.value.map((r: any) => String(r.userName || '')))
-    )
-    const descriptionOptions = computed(() =>
-      toOptions(
-        filterRows.value.map((r: any) =>
-          stripGroupFromDescription(r.description)
-        )
-      )
-    )
-
-    const inRange = (timeStr: string | undefined, range: [number, number] | null) => {
-      if (!range || range.length !== 2) return true
-      if (!timeStr) return false
-      const t = new Date(timeStr.replace(/-/g, '/')).getTime()
-      if (Number.isNaN(t)) return false
-      let [a, b] = range
-      const end = new Date(b)
-      if (
-        end.getHours() === 0 &&
-        end.getMinutes() === 0 &&
-        end.getSeconds() === 0
-      ) {
-        b = new Date(b).setHours(23, 59, 59, 999)
-      }
-      return t >= a && t <= b
-    }
-
-    const filteredTableData = computed(() => {
-      const f = filters.value
-      return (variables.tableData || []).filter((row: any) => {
-        if (f.bizGroup) {
-          const g = resolveWorkflowGroup(
-            { name: row.name, description: row.description, code: row.code },
-            variables.groupRules,
-            variables.groupOverrides,
-            variables.groupCatalog,
-            variables.groupAutoMatch
-          )
-          if (g.name !== f.bizGroup) return false
-        }
-        if (f.name && String(row.name || '') !== f.name) return false
-        if (f.releaseState && row.releaseState !== f.releaseState) return false
-        if (f.scheduleReleaseState) {
-          if (f.scheduleReleaseState === 'NONE') {
-            if (row.scheduleReleaseState) return false
-          } else if (row.scheduleReleaseState !== f.scheduleReleaseState) {
-            return false
-          }
-        }
-        if (f.userName && String(row.userName || '') !== f.userName) return false
-        if (
-          f.description &&
-          stripGroupFromDescription(row.description) !== f.description
-        )
-          return false
-        if (!inRange(row.createTime, f.createTimeRange)) return false
-        if (!inRange(row.updateTime, f.updateTimeRange)) return false
-        return true
-      })
-    })
 
     const requestData = () => {
       getTableData({
         pageSize: variables.pageSize,
         pageNo: variables.page,
-        searchVal: filters.value.name || variables.searchVal || ''
+        searchVal: variables.searchVal
       })
     }
 
-    const handleUpdateList = async () => {
-      await loadFilterSource()
+    const handleUpdateList = () => {
       requestData()
     }
 
-    const handleCopyUpdateList = async () => {
+    const handleCopyUpdateList = () => {
       variables.checkedRowKeys = []
-      await loadFilterSource()
       requestData()
     }
 
     const handleSearch = () => {
       variables.page = 1
-      variables.searchVal = filters.value.name || ''
       requestData()
     }
 
     const onClearSearch = () => {
-      filters.value = {
-        bizGroup: null,
-        name: null,
-        releaseState: null,
-        scheduleReleaseState: null,
-        createTimeRange: null,
-        updateTimeRange: null,
-        userName: null,
-        description: null
-      }
       variables.page = 1
-      variables.searchVal = ''
-      requestData()
+      getTableData({
+        pageSize: variables.pageSize,
+        pageNo: variables.page,
+        searchVal: ''
+      })
     }
 
     const handleChangePageSize = () => {
@@ -275,22 +115,13 @@ export default defineComponent({
       })
     }
 
-    const onBatchGroupSuccess = async () => {
-      variables.checkedRowKeys = []
-      await loadGroupRules()
-      await loadFilterSource()
-      requestData()
-    }
-
     const trim = getCurrentInstance()?.appContext.config.globalProperties.trim
 
     watch(useI18n().locale, () => {
       createColumns(variables)
     })
 
-    onMounted(async () => {
-      await loadGroupRules()
-      await loadFilterSource()
+    onMounted(() => {
       createColumns(variables)
       requestData()
     })
@@ -304,19 +135,11 @@ export default defineComponent({
       createDefinitionDynamic,
       handleChangePageSize,
       batchDeleteWorkflow,
+      batchExportWorkflow,
       batchCopyWorkflow,
       handleCopyUpdateList,
-      onBatchGroupSuccess,
       ...toRefs(variables),
-      filters,
-      filteredTableData,
-      availableGroups,
-      nameOptions,
-      userNameOptions,
-      descriptionOptions,
-      batchGroupShowRef,
       uiSettingStore,
-      projectCode,
       trim
     }
   },
@@ -324,146 +147,51 @@ export default defineComponent({
     const { t } = useI18n()
     const { loadingRef } = this
 
-    const releaseOptions = [
-      { label: t('project.workflow.up_line'), value: 'ONLINE' },
-      { label: t('project.workflow.down_line'), value: 'OFFLINE' }
-    ]
-    const scheduleOptions = [
-      { label: t('project.workflow.time_up_line'), value: 'ONLINE' },
-      { label: t('project.workflow.time_down_line'), value: 'OFFLINE' },
-      { label: t('project.workflow.schedule_none'), value: 'NONE' }
-    ]
-
     return (
       <NSpace vertical>
         <Card>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              width: '100%'
-            }}
-          >
-            <NButton
-              type='primary'
-              size='small'
-              onClick={this.createDefinition}
-              class='btn-create-workflow'
-              style={{ flexShrink: 0 }}
-            >
-              {t('project.workflow.create_workflow')}
-            </NButton>
-            {this.uiSettingStore.getDynamicTask && (
+          <NSpace justify='space-between'>
+            <NSpace>
               <NButton
-                type='warning'
+                type='primary'
                 size='small'
-                onClick={this.createDefinitionDynamic}
-                style={{ flexShrink: 0 }}
+                onClick={this.createDefinition}
+                class='btn-create-workflow'
               >
-                {t('project.workflow.create_workflow_dynamic')}
+                {t('project.workflow.create_workflow')}
               </NButton>
-            )}
-            <NSelect
-              size='small'
-              clearable
-              filterable
-              style={{ width: '140px', flex: '0 1 140px' }}
-              placeholder={t('project.workflow.biz_group')}
-              options={this.availableGroups}
-              value={this.filters.bizGroup}
-              onUpdateValue={(v: any) => (this.filters.bizGroup = v)}
-            />
-            <NSelect
-              size='small'
-              clearable
-              filterable
-              style={{ minWidth: '180px', flex: '1 1 220px' }}
-              placeholder={t('project.workflow.workflow_name')}
-              options={this.nameOptions}
-              value={this.filters.name}
-              onUpdateValue={(v: any) => (this.filters.name = v)}
-            />
-            <NSelect
-              size='small'
-              clearable
-              style={{ width: '100px', flex: '0 0 100px' }}
-              placeholder={t('project.workflow.status')}
-              options={releaseOptions}
-              value={this.filters.releaseState}
-              onUpdateValue={(v: any) => (this.filters.releaseState = v)}
-            />
-            <NSelect
-              size='small'
-              clearable
-              style={{ width: '110px', flex: '0 0 110px' }}
-              placeholder={t('project.workflow.schedule_publish_status')}
-              options={scheduleOptions}
-              value={this.filters.scheduleReleaseState}
-              onUpdateValue={(v: any) =>
-                (this.filters.scheduleReleaseState = v)
-              }
-            />
-            <NDatePicker
-              size='small'
-              type='daterange'
-              clearable
-              style={{ width: '240px', flex: '0 1 240px' }}
-              startPlaceholder={t('project.workflow.create_time')}
-              endPlaceholder={t('project.workflow.create_time')}
-              value={this.filters.createTimeRange}
-              onUpdateValue={(v: any) => (this.filters.createTimeRange = v)}
-            />
-            <NDatePicker
-              size='small'
-              type='daterange'
-              clearable
-              style={{ width: '240px', flex: '0 1 240px' }}
-              startPlaceholder={t('project.workflow.update_time')}
-              endPlaceholder={t('project.workflow.update_time')}
-              value={this.filters.updateTimeRange}
-              onUpdateValue={(v: any) => (this.filters.updateTimeRange = v)}
-            />
-            <NSelect
-              size='small'
-              clearable
-              filterable
-              style={{ minWidth: '120px', flex: '0 1 140px' }}
-              placeholder={t('project.workflow.create_user')}
-              options={this.userNameOptions}
-              value={this.filters.userName}
-              onUpdateValue={(v: any) => (this.filters.userName = v)}
-            />
-            <NSelect
-              size='small'
-              clearable
-              filterable
-              style={{ minWidth: '140px', flex: '1 1 180px' }}
-              placeholder={t('project.workflow.description')}
-              options={this.descriptionOptions}
-              value={this.filters.description}
-              onUpdateValue={(v: any) => (this.filters.description = v)}
-            />
-            <div style={{ flex: '1 1 auto', minWidth: '8px' }} />
-            <NButton
-              type='primary'
-              size='small'
-              onClick={this.handleSearch}
-              style={{ flexShrink: 0 }}
-            >
-              <NIcon>
-                <SearchOutlined />
-              </NIcon>
-              {t('project.workflow.query')}
-            </NButton>
-            <NButton
-              size='small'
-              onClick={this.onClearSearch}
-              style={{ flexShrink: 0 }}
-            >
-              {t('project.workflow.reset')}
-            </NButton>
-          </div>
+              {this.uiSettingStore.getDynamicTask && (
+                <NButton
+                  type='warning'
+                  size='small'
+                  onClick={this.createDefinitionDynamic}
+                >
+                  {t('project.workflow.create_workflow_dynamic')}
+                </NButton>
+              )}
+              <NButton
+                strong
+                secondary
+                size='small'
+                onClick={() => (this.showRef = true)}
+              >
+                {t('project.workflow.import_workflow')}
+              </NButton>
+            </NSpace>
+            <NSpace>
+              <Search
+                placeholder={t('resource.function.enter_keyword_tips')}
+                v-model:value={this.searchVal}
+                onSearch={this.handleSearch}
+                onClear={this.onClearSearch}
+              />
+              <NButton type='primary' size='small' onClick={this.handleSearch}>
+                <NIcon>
+                  <SearchOutlined />
+                </NIcon>
+              </NButton>
+            </NSpace>
+          </NSpace>
         </Card>
         <Card title={t('project.workflow.workflow_definition')}>
           <NSpace vertical>
@@ -471,7 +199,7 @@ export default defineComponent({
               loading={loadingRef}
               rowKey={(row) => row.code}
               columns={this.columns}
-              data={this.filteredTableData}
+              data={this.tableData}
               striped
               v-model:checked-row-keys={this.checkedRowKeys}
               row-class-name='items'
@@ -504,6 +232,23 @@ export default defineComponent({
                 </NTooltip>
                 <NTooltip>
                   {{
+                    default: () => t('project.workflow.batch_export'),
+                    trigger: () => (
+                      <NButton
+                        tag='div'
+                        size='small'
+                        type='primary'
+                        disabled={this.checkedRowKeys.length <= 0}
+                        onClick={this.batchExportWorkflow}
+                        class='btn-delete-all'
+                      >
+                        {t('project.workflow.batch_export')}
+                      </NButton>
+                    )
+                  }}
+                </NTooltip>
+                <NTooltip>
+                  {{
                     default: () => t('project.workflow.batch_copy'),
                     trigger: () => (
                       <NButton
@@ -515,22 +260,6 @@ export default defineComponent({
                         class='btn-delete-all'
                       >
                         {t('project.workflow.batch_copy')}
-                      </NButton>
-                    )
-                  }}
-                </NTooltip>
-                <NTooltip>
-                  {{
-                    default: () => t('project.workflow.batch_group'),
-                    trigger: () => (
-                      <NButton
-                        tag='div'
-                        size='small'
-                        type='primary'
-                        disabled={this.checkedRowKeys.length <= 0}
-                        onClick={() => (this.batchGroupShowRef = true)}
-                      >
-                        {t('project.workflow.batch_group')}
                       </NButton>
                     )
                   }}
@@ -550,6 +279,10 @@ export default defineComponent({
             </NSpace>
           </NSpace>
         </Card>
+        <ImportModal
+          v-model:show={this.showRef}
+          onUpdateList={this.handleUpdateList}
+        />
         <StartModal
           v-model:row={this.row}
           v-model:show={this.startShowRef}
@@ -571,13 +304,6 @@ export default defineComponent({
           v-model:codes={this.checkedRowKeys}
           v-model:show={this.copyShowRef}
           onUpdateList={this.handleCopyUpdateList}
-        />
-        <BatchGroupModal
-          v-model:show={this.batchGroupShowRef}
-          projectCode={this.projectCode}
-          codes={this.checkedRowKeys}
-          groupOptions={this.availableGroups}
-          onSuccess={this.onBatchGroupSuccess}
         />
         <DependenciesModal
           v-model:row={this.row}

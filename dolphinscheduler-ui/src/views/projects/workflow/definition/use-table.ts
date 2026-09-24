@@ -24,6 +24,7 @@ import { useTextCopy } from '../components/dag/use-text-copy'
 import {
   batchCopyByCodes,
   batchDeleteByCodes,
+  batchExportByCodes,
   deleteByCode,
   queryListPaging,
   release
@@ -40,7 +41,6 @@ import {
   DefaultTableWidth
 } from '@/common/column-width-config'
 import type { IDefinitionParam } from './types'
-import { resolveWorkflowGroup } from '@/views/projects/workflow/common/workflow-group'
 import type { Router } from 'vue-router'
 import type { TableColumns, RowKey } from 'naive-ui/es/data-table/src/interface'
 import { useDependencies } from '../../components/dependencies/use-dependencies'
@@ -57,10 +57,6 @@ export function useTable() {
     checkedRowKeys: [] as Array<RowKey>,
     row: {},
     tableData: [],
-    groupRules: [] as Array<{ group: string; pattern: string }>,
-    groupOverrides: {} as Record<string, string>,
-    groupCatalog: [] as Array<{ id: string; name: string; color: string; description?: string }>,
-    groupAutoMatch: true,
     projectCode: ref(Number(router.currentRoute.value.params.projectCode)),
     page: ref(1),
     pageSize: ref(10),
@@ -97,39 +93,6 @@ export function useTable() {
         key: 'id',
         ...COLUMN_WIDTH_CONFIG['index'],
         render: (row, index) => index + 1
-      },
-      {
-        title: t('project.workflow.biz_group'),
-        key: 'bizGroup',
-        width: 120,
-        render: (row: any) => {
-          const g = resolveWorkflowGroup(
-            { name: row.name, description: row.description, code: row.code },
-            variables.groupRules,
-            variables.groupOverrides,
-            variables.groupCatalog,
-            variables.groupAutoMatch
-          )
-          if (!g.name) {
-            return h(
-              'span',
-              { style: 'color:#94a3b8' },
-              t('project.workflow.ungrouped')
-            )
-          }
-          return h(
-            NTag,
-            {
-              size: 'small',
-              style: {
-                background: g.color,
-                color: '#fff',
-                border: 'none'
-              }
-            },
-            { default: () => g.name }
-          )
-        }
       },
       {
         title: t('project.workflow.workflow_name'),
@@ -313,6 +276,7 @@ export function useTable() {
             onReleaseWorkflow: () => releaseWorkflow(row),
             onReleaseScheduler: () => releaseScheduler(row),
             onCopyWorkflow: () => copyWorkflow(row),
+            onExportWorkflow: () => exportWorkflow(row),
             onGotoWorkflowTree: () => gotoWorkflowTree(row)
           })
       }
@@ -374,6 +338,19 @@ export function useTable() {
         pageNo: variables.page,
         searchVal: variables.searchVal
       })
+    })
+  }
+
+  const batchExportWorkflow = () => {
+    const fileName = 'workflow_' + new Date().getTime()
+    const data = {
+      codes: _.join(variables.checkedRowKeys, ',')
+    }
+
+    batchExportByCodes(data, variables.projectCode).then((res: any) => {
+      downloadBlob(res, fileName)
+      window.$message.success(t('project.workflow.success'))
+      variables.checkedRowKeys = []
     })
   }
 
@@ -534,6 +511,42 @@ export function useTable() {
     })
   }
 
+  const downloadBlob = (data: any, fileNameS = 'json') => {
+    if (!data) {
+      return
+    }
+    const blob = new Blob([data])
+    const fileName = `${fileNameS}.json`
+    if ('download' in document.createElement('a')) {
+      // Not IE
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.style.display = 'none'
+      link.href = url
+      link.setAttribute('download', fileName)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link) // remove element after downloading is complete.
+      window.URL.revokeObjectURL(url) // release blob object
+    } else {
+      // IE 10+
+      if (window.navigator.msSaveBlob) {
+        window.navigator.msSaveBlob(blob, fileName)
+      }
+    }
+  }
+
+  const exportWorkflow = (row: any) => {
+    const fileName = 'workflow_' + new Date().getTime()
+
+    const data = {
+      codes: String(row.code)
+    }
+    batchExportByCodes(data, variables.projectCode).then((res: any) => {
+      downloadBlob(res, fileName)
+    })
+  }
+
   const gotoWorkflowTree = (row: any) => {
     router.push({
       name: 'workflow-definition-tree',
@@ -544,28 +557,17 @@ export function useTable() {
   const getTableData = (params: IDefinitionParam) => {
     if (variables.loadingRef) return
     variables.loadingRef = true
-    // Always release loading lock, even when request fails.
-    const queryStatePromise = queryListPaging(
-      { ...params },
-      variables.projectCode
-    )
-      .then((res: any) => {
+    const { state } = useAsyncState(
+      queryListPaging({ ...params }, variables.projectCode).then((res: any) => {
         variables.totalCount = res.total
         variables.totalPage = res.totalPage
         variables.tableData = res.totalList.map((item: any) => {
           return { ...item }
         })
-      })
-      .catch((err: Error) => {
-        window.$message.error(
-          err?.message || t('project.workflow.request_failed')
-        )
-      })
-      .finally(() => {
         variables.loadingRef = false
-      })
-
-    const { state } = useAsyncState(queryStatePromise, { total: 0, table: [] })
+      }),
+      { total: 0, table: [] }
+    )
     return state
   }
 
@@ -574,6 +576,7 @@ export function useTable() {
     createColumns,
     getTableData,
     batchDeleteWorkflow,
+    batchExportWorkflow,
     batchCopyWorkflow
   }
 }

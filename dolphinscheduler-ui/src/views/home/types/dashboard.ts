@@ -16,6 +16,7 @@ export type MetricKey =
   | 'waiting'
   | 'failure'
   | 'completion'
+  | 'quality'
 
 export interface DashboardScope {
   projectCode: number | null
@@ -51,6 +52,10 @@ export interface InstanceRow {
   /** TASK vs WORKFLOW — used by openInstance navigation */
   entityType?: 'TASK' | 'WORKFLOW'
   workflowInstanceId?: number
+  taskType?: string
+  appLink?: string
+  checkActual?: number
+  checkPassed?: boolean
 }
 
 export interface ScheduleRow {

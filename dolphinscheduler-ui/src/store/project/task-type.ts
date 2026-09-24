@@ -38,6 +38,9 @@ export const TASK_TYPES_MAP = {
   SQL: {
     alias: 'SQL'
   },
+  SQL_CHECK: {
+    alias: 'SQL_CHECK'
+  },
   SPARK: {
     alias: 'SPARK'
   },

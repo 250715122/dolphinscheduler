@@ -160,6 +160,7 @@ export default {
     username: '用户名',
     username_exists: '用户名已存在',
     username_tips: '请输入用户名',
+    username_valid_tips: '用户名支持中文、英文、数字及._-，长度 2～39',
     user_password: '密码',
     user_password_tips: '请输入包含字母和数字，长度在6～20之间的密码',
     confirm_password_tips: '两次密码输入不一致',

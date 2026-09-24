@@ -26,6 +26,7 @@ import org.apache.dolphinscheduler.dao.entity.User;
 import java.security.MessageDigest;
 import java.util.UUID;
 
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 
 import lombok.NonNull;
@@ -71,10 +72,27 @@ public class CasdoorAuthenticator extends AbstractSsoAuthenticator {
         }
         HttpServletRequest request = servletRequestAttributes.getRequest();
         String originalState = (String) request.getSession().getAttribute(Constants.SSO_LOGIN_USER_STATE);
-        // Invalid state
-        request.getSession().setAttribute(Constants.SSO_LOGIN_USER_STATE, null);
+        if (originalState == null) {
+            Cookie[] cookies = request.getCookies();
+            if (cookies != null) {
+                for (Cookie cookie : cookies) {
+                    if (Constants.SSO_LOGIN_USER_STATE.equals(cookie.getName())
+                            && cookie.getValue() != null && !cookie.getValue().isEmpty()) {
+                        originalState = cookie.getValue();
+                        log.warn("Casdoor SSO state recovered from cookie (HttpSession missing).");
+                        break;
+                    }
+                }
+            }
+        }
+        // one-time use
+        request.getSession().removeAttribute(Constants.SSO_LOGIN_USER_STATE);
         // Check state to protect from CSRF attack
-        if (originalState == null || !MessageDigest.isEqual(originalState.getBytes(), state.getBytes())) {
+        if (originalState == null || state == null
+                || !MessageDigest.isEqual(originalState.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                        state.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
+            log.error("Casdoor SSO state mismatch. sessionStatePresent={}, callbackState={}",
+                    originalState != null, state);
             return null;
         }
 
@@ -82,9 +100,10 @@ public class CasdoorAuthenticator extends AbstractSsoAuthenticator {
         CasdoorUser casdoorUser = casdoorAuthService.parseJwtToken(token);
         User user = null;
         if (casdoorUser.getName() != null) {
-            // check if user exist
             user = usersService.getUserByUserName(casdoorUser.getName());
             if (user == null) {
+                // Prefer Chinese display name when Casdoor name is an opaque id,
+                // but keep Casdoor name as DS username for stable identity.
                 user = usersService.createUser(getUserType(casdoorUser.getName()), casdoorUser.getName(),
                         casdoorUser.getEmail());
             }

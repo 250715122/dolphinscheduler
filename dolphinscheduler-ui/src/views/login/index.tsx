@@ -73,19 +73,27 @@ const login = defineComponent({
     cookies.set('language', localesStore.getLocales, { path: '/' })
 
     onMounted(async () => {
-      const ssoLoginUrlRes = await ssoLoginUrl()
-      state.loginForm.ssoLoginUrl = ssoLoginUrlRes
-      if (state.loginForm.ssoLoginUrl) {
-        const url = new URL(window.location.href)
-        const ssoState = url.searchParams.get('state')
-        const ssoCode = url.searchParams.get('code')
-        if (ssoState && ssoCode) {
-          state.loginForm.userName = ssoState
-          state.loginForm.userPassword = ssoCode
-          handleLogin()
-        }
+      // OAuth callback: exchange code/state first. Do NOT call /login/sso here —
+      // that endpoint mints/rotates CSRF state and breaks DingTalk/Casdoor round-trips
+      // when the browser session cookie was lost or reminted.
+      const url = new URL(window.location.href)
+      const ssoState = url.searchParams.get('state')
+      const ssoCode = url.searchParams.get('code')
+      if (ssoState && ssoCode) {
+        state.loginForm.userName = ssoState
+        state.loginForm.userPassword = ssoCode
+        // still load SSO button url in background for retry, but after login attempt starts
+        handleLogin()
+        ssoLoginUrl()
+          .then((res: string) => {
+            state.loginForm.ssoLoginUrl = res || ''
+          })
+          .catch(() => {
+            state.loginForm.ssoLoginUrl = ''
+          })
       } else {
-        state.loginForm.ssoLoginUrl = ''
+        const ssoLoginUrlRes = await ssoLoginUrl()
+        state.loginForm.ssoLoginUrl = ssoLoginUrlRes || ''
       }
       handleRedirect()
     })

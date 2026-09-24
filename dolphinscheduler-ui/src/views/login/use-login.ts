@@ -44,27 +44,42 @@ export function useLogin(state: any) {
   const timezoneStore = useTimezoneStore()
   const route = useRoute()
   const handleLogin = () => {
+    const doLogin = async () => {
+      const loginRes: LoginRes = await login({ ...state.loginForm })
+      await userStore.setSessionId(loginRes.sessionId)
+      await userStore.setSecurityConfigType(loginRes.securityConfigType)
+      cookies.set('sessionId', loginRes.sessionId, { path: '/' })
+
+      const userInfoRes: UserInfoRes = await getUserInfo()
+      await userStore.setUserInfo(userInfoRes)
+
+      const baseResDir = await queryBaseDir({
+        type: 'FILE'
+      })
+      await userStore.setBaseResDir(baseResDir)
+
+      const timezone = userInfoRes.timeZone ? userInfoRes.timeZone : 'UTC'
+      await timezoneStore.setTimezone(timezone)
+
+      const path = routeStore.lastRoute
+
+      router.push({ path: path || 'home' })
+    }
+
+    // Casdoor/OIDC callback posts UUID state as userName — skip password form rules
+    const isSsoCallback =
+      typeof state.loginForm.userName === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        state.loginForm.userName
+      )
+    if (isSsoCallback) {
+      doLogin()
+      return
+    }
+
     state.loginFormRef.validate(async (valid: any) => {
       if (!valid) {
-        const loginRes: LoginRes = await login({ ...state.loginForm })
-        await userStore.setSessionId(loginRes.sessionId)
-        await userStore.setSecurityConfigType(loginRes.securityConfigType)
-        cookies.set('sessionId', loginRes.sessionId, { path: '/' })
-
-        const userInfoRes: UserInfoRes = await getUserInfo()
-        await userStore.setUserInfo(userInfoRes)
-
-        const baseResDir = await queryBaseDir({
-          type: 'FILE'
-        })
-        await userStore.setBaseResDir(baseResDir)
-
-        const timezone = userInfoRes.timeZone ? userInfoRes.timeZone : 'UTC'
-        await timezoneStore.setTimezone(timezone)
-
-        const path = routeStore.lastRoute
-
-        router.push({ path: path || 'home' })
+        await doLogin()
       }
     })
   }

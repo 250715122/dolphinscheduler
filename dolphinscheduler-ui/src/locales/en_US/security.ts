@@ -162,6 +162,7 @@ export default {
     username: 'Username',
     username_exists: 'The username already exists',
     username_tips: 'Please enter username',
+    username_valid_tips: 'Username supports Chinese, letters, digits and ._- (length 2-39)',
     user_password: 'Password',
     user_password_tips:
       'Please enter a password containing letters and numbers with a length between 6 and 20',

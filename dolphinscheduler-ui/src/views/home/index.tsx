@@ -251,7 +251,18 @@ export default defineComponent({
                 onUpdate:page={(p: number) => (this.durationPage = p)}
                 onOpen={openInstance}
               />
+            </div>
+          </div>
 
+          <div class={styles.trendBottom}>
+            <div class={styles.colTrend}>
+              <TrendPanel
+                points={trendPoints}
+                mode={trendMode}
+                onUpdate:mode={(m: any) => (this.trendMode = m)}
+              />
+            </div>
+            <div class={styles.colQuality}>
               <QualityRank
                 rows={qualityPageRows}
                 total={qualityTotal}
@@ -262,16 +273,7 @@ export default defineComponent({
                 onUpdate:page={(p: number) => (this.qualityPage = p)}
                 onOpen={openInstance}
               />
-
             </div>
-          </div>
-
-          <div class={styles.trendBottom}>
-            <TrendPanel
-              points={trendPoints}
-              mode={trendMode}
-              onUpdate:mode={(m: any) => (this.trendMode = m)}
-            />
           </div>
         </NSpin></div>
       </div>

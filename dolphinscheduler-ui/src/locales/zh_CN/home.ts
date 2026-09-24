@@ -53,7 +53,7 @@ export default {
   ops_trend_month_desc: '按日统计 · 默认任务实例，可切换工作流数量',
   ops_trend_workflow_instances: '工作流数量',
   ops_quality_rank: '数据质量',
-  ops_quality_rank_desc: 'SQL_CHECK · 近 30 天 · 失败 {fail} 条',
+  ops_quality_rank_desc: 'SQL_CHECK · 近 7 天 · 失败 {fail} 条',
   ops_quality_pass: '通过',
   ops_quality_fail: '未通过',
   ops_col_actual: '实际值',

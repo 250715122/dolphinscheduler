@@ -39,26 +39,31 @@ export function useTable() {
   const getList = async () => {
     if (state.loading) return
     state.loading = true
-
-    const { totalList, total } = await queryUserList({
-      pageNo: state.page,
-      pageSize: state.pageSize,
-      searchVal: state.searchVal
-    })
-    state.loading = false
-    if (!totalList) throw Error()
-    state.list = totalList.map((record: IRecord) => {
-      record.createTime = record.createTime
-        ? format(parseTime(record.createTime), 'yyyy-MM-dd HH:mm:ss')
-        : ''
-      record.updateTime = record.updateTime
-        ? format(parseTime(record.updateTime), 'yyyy-MM-dd HH:mm:ss')
-        : ''
-      record.tenantId = record.tenantId === 0 ? null : record.tenantId
-      return record
-    })
-
-    state.itemCount = total
+    try {
+      const { totalList, total } = await queryUserList({
+        pageNo: state.page,
+        pageSize: state.pageSize,
+        searchVal: state.searchVal
+      })
+      if (!totalList) return
+      state.list = totalList.map((record: IRecord) => {
+        record.createTime = record.createTime
+          ? format(parseTime(record.createTime), 'yyyy-MM-dd HH:mm:ss')
+          : ''
+        record.updateTime = record.updateTime
+          ? format(parseTime(record.updateTime), 'yyyy-MM-dd HH:mm:ss')
+          : ''
+        record.tenantId = record.tenantId === 0 ? null : record.tenantId
+        return record
+      })
+      state.itemCount = total
+    } catch (e: any) {
+      console.error('user-manage getList failed', e)
+      state.list = []
+      state.itemCount = 0
+    } finally {
+      state.loading = false
+    }
   }
 
   const updateList = () => {

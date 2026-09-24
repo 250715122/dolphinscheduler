@@ -28,6 +28,8 @@ public class CheckUtilsTest {
     @Test
     public void testCheckUserName() {
         Assertions.assertTrue(CheckUtils.checkUserName("test01"));
+        Assertions.assertTrue(CheckUtils.checkUserName("张三"));
+        Assertions.assertTrue(CheckUtils.checkUserName("用户_01"));
         Assertions.assertFalse(CheckUtils.checkUserName(null));
         Assertions.assertFalse(CheckUtils.checkUserName("test01@abc"));
     }

@@ -16,7 +16,7 @@
  */
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { pick } from 'lodash'
+import pick from 'lodash/pick'
 import { queryTenantList } from '@/service/modules/tenants'
 import { queryList } from '@/service/modules/queues'
 import { verifyUserName, createUser, updateUser } from '@/service/modules/users'
@@ -55,8 +55,13 @@ export function useUserDetail() {
       trigger: ['input', 'blur'],
       required: true,
       validator(validator: any, value: string) {
-        if (!value.trim()) {
+        const name = (value ?? '').toString().trim()
+        if (!name) {
           return new Error(t('security.user.username_tips'))
+        }
+        // Chinese / letters / digits / ._- , length 2-39
+        if (!/^[一-龥a-zA-Z0-9._-]{2,39}$/.test(name)) {
+          return new Error(t('security.user.username_valid_tips'))
         }
       }
     },

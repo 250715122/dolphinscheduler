@@ -31,6 +31,7 @@ import UpcomingSchedules from '@/views/home/components/upcoming-schedules'
 import ServiceSummary from '@/views/home/components/service-summary'
 import TrendPanel from '@/views/home/components/trend-panel'
 import DurationRank from '@/views/home/components/duration-rank'
+import QualityRank from '@/views/home/components/quality-rank'
 import styles from '@/views/home/styles/dashboard.module.scss'
 import { useThemeStore } from '@/store/theme/theme'
 import type { MetricCardModel, TimePreset } from '@/views/home/types/dashboard'
@@ -78,6 +79,11 @@ const ProjectOverview = defineComponent({
       trendPoints,
       trendMode,
       durationPageRows,
+      qualityPageRows,
+      qualityTotal,
+      qualityPage,
+      qualityPageSize,
+      qualityFailCount,
       durationTotal,
       durationPage,
       durationPageSize,
@@ -250,11 +256,25 @@ const ProjectOverview = defineComponent({
             </div>
 
             <div class={styles.trendBottom}>
-              <TrendPanel
-                points={trendPoints}
-                mode={trendMode}
-                onUpdate:mode={(m: any) => (this.trendMode = m)}
-              />
+              <div class={styles.colTrend}>
+                <TrendPanel
+                  points={trendPoints}
+                  mode={trendMode}
+                  onUpdate:mode={(m: any) => (this.trendMode = m)}
+                />
+              </div>
+              <div class={styles.colQuality}>
+                <QualityRank
+                  rows={qualityPageRows}
+                  total={qualityTotal}
+                  page={qualityPage}
+                  pageSize={qualityPageSize}
+                  failCount={qualityFailCount}
+                  loading={loading}
+                  onUpdate:page={(p: number) => (this.qualityPage = p)}
+                  onOpen={openInstance}
+                />
+              </div>
             </div>
           </NSpin>
         </div>

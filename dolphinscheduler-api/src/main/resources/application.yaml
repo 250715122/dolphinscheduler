@@ -20,6 +20,11 @@ server:
   servlet:
     session:
       timeout: 120m
+      cookie:
+        # Keep OAuth CSRF state across DingTalk/Casdoor top-level redirects
+        same-site: lax
+        http-only: true
+        path: /
     context-path: /dolphinscheduler/
   compression:
     enabled: true

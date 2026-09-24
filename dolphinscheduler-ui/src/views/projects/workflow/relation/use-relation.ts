@@ -14,6 +14,7 @@ import type {
 import { extractPrefix } from './utils/group'
 import {
   buildTopoPositions,
+  type TopoLayoutDir,
   neighbors,
   computeSummary,
   type RelationLink,
@@ -38,6 +39,8 @@ export function useRelation() {
     loading: false,
     selectedId: null as null | string | number,
     viewMode: 'topology' as ViewMode,
+    /** Default TB: siblings spread horizontally (landscape-friendly). */
+    layoutDir: 'TB' as TopoLayoutDir,
     filterCollapsed: true,
     keyword: '',
     groups: [] as string[],
@@ -354,7 +357,7 @@ export function useRelation() {
     const links = variables.rawLinks.filter(
       (l) => ids.has(String(l.source)) && ids.has(String(l.target))
     )
-    return buildTopoPositions(list, links)
+    return buildTopoPositions(list, links, variables.layoutDir)
   })
 
   const visibleLinks = computed(() => {

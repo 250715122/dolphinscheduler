@@ -439,18 +439,50 @@ const workflowRelation = defineComponent({
             <div class={styles.body}>
               <div class={styles.canvas} data-relation-canvas='1'>
                 <div class={styles.canvasHead}>
-                  <NRadioGroup
-                    value={this.viewMode}
-                    size='small'
-                    onUpdateValue={(v: any) => (this.viewMode = v)}
-                  >
-                    <NRadioButton value='topology'>
-                      {t('project.workflow.relation_view_topology')}
-                    </NRadioButton>
-                    <NRadioButton value='timeline'>
-                      {t('project.workflow.relation_view_timeline')}
-                    </NRadioButton>
-                  </NRadioGroup>
+                  <div class={styles.canvasHeadLeft}>
+                    <NRadioGroup
+                      value={this.viewMode}
+                      size='small'
+                      onUpdateValue={(v: any) => (this.viewMode = v)}
+                    >
+                      <NRadioButton value='topology'>
+                        {t('project.workflow.relation_view_topology')}
+                      </NRadioButton>
+                      <NRadioButton value='timeline'>
+                        {t('project.workflow.relation_view_timeline')}
+                      </NRadioButton>
+                    </NRadioGroup>
+                    {this.viewMode === 'topology' ? (
+                      <NSelect
+                        size='small'
+                        style={{ width: '168px' }}
+                        value={this.layoutDir}
+                        options={[
+                          {
+                            label: t('project.workflow.relation_layout_lr'),
+                            value: 'LR'
+                          },
+                          {
+                            label: t('project.workflow.relation_layout_tb'),
+                            value: 'TB'
+                          },
+                          {
+                            label: t('project.workflow.relation_layout_rl'),
+                            value: 'RL'
+                          },
+                          {
+                            label: t('project.workflow.relation_layout_bt'),
+                            value: 'BT'
+                          }
+                        ]}
+                        onUpdateValue={(v: any) => {
+                          if (!v) return
+                          this.layoutDir = v
+                          this.fitToken = this.fitToken + 1
+                        }}
+                      />
+                    ) : null}
+                  </div>
                   <div class={styles.legend}>
                     <span>
                       <i class={styles.dot} style='background:#16a34a' />
@@ -477,6 +509,7 @@ const workflowRelation = defineComponent({
                       labelShow={this.labelShow}
                       fitToken={this.fitToken}
                       darkTheme={this.themeStore.darkTheme}
+                      layoutDir={this.layoutDir}
                       onSelect={(id: any) => { if (id != null) this.selectNode(id, { keep: true }) }}
                       onFocus={(id: any) => this.focusNeighborhood(id, 2)}
                     />

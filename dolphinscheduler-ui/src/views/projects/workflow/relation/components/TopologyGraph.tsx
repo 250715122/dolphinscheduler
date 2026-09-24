@@ -11,7 +11,7 @@ import { useI18n } from 'vue-i18n'
 import { Graph } from '@antv/x6'
 import { pastelOf, prefixColor, statusAccent } from '../utils/group'
 import { crontabToDayWindow } from '../utils/schedule'
-import type { RelationNode, RelationLink } from '../utils/layout'
+import type { RelationNode, RelationLink, TopoLayoutDir } from '../utils/layout'
 
 const NODE_W = 228
 const NODE_H = 96
@@ -93,6 +93,45 @@ function ensureRegistry() {
   })
 }
 
+
+function portsForDir(dir: TopoLayoutDir) {
+  const vertical = dir === 'TB' || dir === 'BT'
+  const inPos = vertical
+    ? dir === 'TB'
+      ? 'top'
+      : 'bottom'
+    : dir === 'LR'
+      ? 'left'
+      : 'right'
+  const outPos = vertical
+    ? dir === 'TB'
+      ? 'bottom'
+      : 'top'
+    : dir === 'LR'
+      ? 'right'
+      : 'left'
+  return {
+    groups: {
+      in: {
+        position: { name: inPos },
+        attrs: {
+          circle: { r: 0, magnet: false, strokeWidth: 0, fill: 'transparent' }
+        }
+      },
+      out: {
+        position: { name: outPos },
+        attrs: {
+          circle: { r: 0, magnet: false, strokeWidth: 0, fill: 'transparent' }
+        }
+      }
+    },
+    items: [
+      { id: 'in', group: 'in' },
+      { id: 'out', group: 'out' }
+    ]
+  }
+}
+
 const TopologyGraph = defineComponent({
   name: 'RelationTopologyGraph',
   props: {
@@ -105,7 +144,11 @@ const TopologyGraph = defineComponent({
     highlightIds: { type: Array as PropType<string[]>, default: () => [] },
     labelShow: { type: Boolean as PropType<boolean>, default: true },
     fitToken: { type: Number as PropType<number>, default: 0 },
-    darkTheme: { type: Boolean as PropType<boolean>, default: false }
+    darkTheme: { type: Boolean as PropType<boolean>, default: false },
+    layoutDir: {
+      type: String as PropType<TopoLayoutDir>,
+      default: 'TB'
+    }
   },
   emits: ['select', 'focus'],
   setup(props, { emit }) {
@@ -221,36 +264,7 @@ const TopologyGraph = defineComponent({
                 }
               }
             },
-            ports: {
-              groups: {
-                in: {
-                  position: 'left',
-                  attrs: {
-                    circle: {
-                      r: 0,
-                      magnet: false,
-                      strokeWidth: 0,
-                      fill: 'transparent'
-                    }
-                  }
-                },
-                out: {
-                  position: 'right',
-                  attrs: {
-                    circle: {
-                      r: 0,
-                      magnet: false,
-                      strokeWidth: 0,
-                      fill: 'transparent'
-                    }
-                  }
-                }
-              },
-              items: [
-                { id: 'in', group: 'in' },
-                { id: 'out', group: 'out' }
-              ]
-            },
+            ports: portsForDir(props.layoutDir),
             zIndex: 2
           })
         )
@@ -421,7 +435,8 @@ const TopologyGraph = defineComponent({
         props.links,
         props.selectedId,
         props.highlightIds,
-        props.labelShow
+        props.labelShow,
+        props.layoutDir
       ],
       () => {
         if (!graph) syncSizeAndRender()

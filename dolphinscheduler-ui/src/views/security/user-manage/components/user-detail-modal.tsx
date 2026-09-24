@@ -117,7 +117,7 @@ export const UserModal = defineComponent({
               allowInput={this.trim}
               class='input-username'
               v-model:value={this.formData.userName}
-              minlength={3}
+              minlength={2}
               maxlength={39}
               placeholder={t('security.user.username_tips')}
             />

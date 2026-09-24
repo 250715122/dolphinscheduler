@@ -756,7 +756,7 @@ export function useDashboard(options: DashboardOptions = {}) {
   const loadQualityRank = async () => {
     const list = targetProjects()
     const rows: InstanceRow[] = []
-    const start = format(subDays(startOfToday(), 29), 'yyyy-MM-dd HH:mm:ss')
+    const start = format(subDays(startOfToday(), 6), 'yyyy-MM-dd HH:mm:ss')
     const end = format(Date.now(), 'yyyy-MM-dd HH:mm:ss')
     await Promise.all(
       list.map(async (project) => {

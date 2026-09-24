@@ -94,7 +94,7 @@ export function useTable() {
             {
               onClick: () => {
                 router.push({
-                  path: `/projects/${String(row.code)}/workflow/relation`,
+                  path: `/projects/${String(row.code)}/workflow-definition`,
                   query: { projectName: row.name }
                 })
               }

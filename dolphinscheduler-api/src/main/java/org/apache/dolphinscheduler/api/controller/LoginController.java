@@ -167,18 +167,26 @@ public class LoginController extends BaseController {
     @Operation(summary = "sso login", description = "SSO_LOGIN_NOTES")
     @GetMapping(value = "/login/sso")
     @ApiException(NOT_SUPPORT_SSO)
-    public Result ssoLogin(HttpServletRequest request) {
+    public Result ssoLogin(HttpServletRequest request, HttpServletResponse response) {
         if (authenticator instanceof OidcAuthenticator) {
             return Result.success(null);
         }
 
         if (authenticator instanceof AbstractSsoAuthenticator) {
-            String randomState = UUID.randomUUID().toString();
             HttpSession session = request.getSession();
-            if (session.getAttribute(Constants.SSO_LOGIN_USER_STATE) == null) {
-                session.setAttribute(Constants.SSO_LOGIN_USER_STATE, randomState);
+            // Reuse existing OAuth state so a remount/callback does not mint a mismatched state.
+            String state = (String) session.getAttribute(Constants.SSO_LOGIN_USER_STATE);
+            if (state == null) {
+                state = UUID.randomUUID().toString();
+                session.setAttribute(Constants.SSO_LOGIN_USER_STATE, state);
             }
-            return Result.success(((AbstractSsoAuthenticator) authenticator).getSignInUrl(randomState));
+            // Cookie backup: DingTalk/Casdoor cross-site round-trip may drop HttpSession
+            Cookie stateCookie = new Cookie(Constants.SSO_LOGIN_USER_STATE, state);
+            stateCookie.setPath("/");
+            stateCookie.setHttpOnly(true);
+            stateCookie.setMaxAge(600);
+            response.addCookie(stateCookie);
+            return Result.success(((AbstractSsoAuthenticator) authenticator).getSignInUrl(state));
         }
         return Result.success();
     }

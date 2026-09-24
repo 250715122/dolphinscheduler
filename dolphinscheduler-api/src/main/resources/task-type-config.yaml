@@ -22,6 +22,7 @@ task:
     - 'PYTHON'
     - 'PROCEDURE'
     - 'SQL'
+    - 'SQL_CHECK'
     - 'SPARK'
     - 'FLINK'
     - 'GRPC'

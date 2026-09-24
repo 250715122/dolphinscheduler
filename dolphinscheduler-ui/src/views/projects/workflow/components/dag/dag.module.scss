@@ -110,7 +110,8 @@ $bgLight: #ffffff;
     &.icon-procedure {
       background-image: url('/images/task-icons/procedure.png');
     }
-    &.icon-sql {
+    &.icon-sql,
+    &.icon-sql_check {
       background-image: url('/images/task-icons/sql.png');
     }
     &.icon-flink,
@@ -220,7 +221,8 @@ $bgLight: #ffffff;
       &.icon-procedure {
         background-image: url('/images/task-icons/procedure_hover.png');
       }
-      &.icon-sql {
+      &.icon-sql,
+    &.icon-sql_check {
         background-image: url('/images/task-icons/sql_hover.png');
       }
       &.icon-flink,

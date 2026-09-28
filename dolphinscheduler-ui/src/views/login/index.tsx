@@ -82,15 +82,10 @@ const login = defineComponent({
       if (ssoState && ssoCode) {
         state.loginForm.userName = ssoState
         state.loginForm.userPassword = ssoCode
-        // still load SSO button url in background for retry, but after login attempt starts
+        // Critical: do not call /login/sso while exchanging code/state.
+        // That endpoint can mint a new CSRF state (empty HttpSession after DingTalk
+        // round-trip) and overwrite the backup cookie, causing state mismatch.
         handleLogin()
-        ssoLoginUrl()
-          .then((res: string) => {
-            state.loginForm.ssoLoginUrl = res || ''
-          })
-          .catch(() => {
-            state.loginForm.ssoLoginUrl = ''
-          })
       } else {
         const ssoLoginUrlRes = await ssoLoginUrl()
         state.loginForm.ssoLoginUrl = ssoLoginUrlRes || ''
@@ -131,6 +126,15 @@ const login = defineComponent({
         <div class={styles['login-model']}>
           <div class={styles.logo}>
             <div class={styles['logo-img']} />
+            <div
+              class={styles['logo-hint']}
+              v-show={
+                this.loginMode === 'chooser' &&
+                this.loginForm.ssoLoginUrl.length !== 0
+              }
+            >
+              {this.t('login.ssoLoginHint')}
+            </div>
           </div>
           <div
             class={styles['form-model']}
@@ -141,20 +145,20 @@ const login = defineComponent({
           >
             <a href={this.loginForm.ssoLoginUrl} style='text-decoration:none'>
               <NButton
-                class='btn-login-sso'
+                class={[styles['btn-login-sso'], 'btn-login-sso']}
                 round
                 type='info'
-                style={{ width: '100%', marginTop: '12px' }}
+                style={{ width: '100%', marginTop: '8px' }}
               >
                 {this.t('login.ssoLogin')}
               </NButton>
             </a>
             <NButton
-              class='btn-login-password-option'
+              class={[styles['btn-login-password-option'], 'btn-login-password-option']}
               round
               secondary
               type='info'
-              style={{ width: '100%', marginTop: '16px' }}
+              style={{ width: '100%', marginTop: '12px' }}
               onClick={() => {
                 this.loginMode = 'password'
               }}

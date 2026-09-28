@@ -333,6 +333,30 @@
   color: var(--rel-muted);
 }
 
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.legendItem:hover {
+  background: var(--rel-chip-bg);
+  color: var(--rel-text);
+}
+
+.legendActive {
+  background: rgba(37, 99, 235, 0.1);
+  border-color: rgba(37, 99, 235, 0.35);
+  color: #2563eb;
+  font-weight: 600;
+}
+
 .dot {
   display: inline-block;
   width: 8px;

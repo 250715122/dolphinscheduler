@@ -25,6 +25,7 @@ import {
   NTooltip,
   NPopconfirm,
   NSelect,
+  NAutoComplete,
   NDatePicker
 } from 'naive-ui'
 import {
@@ -195,7 +196,10 @@ export default defineComponent({
           )
           if (g.name !== f.bizGroup) return false
         }
-        if (f.name && String(row.name || '') !== f.name) return false
+        if (f.name) {
+          const q = String(f.name).trim().toLowerCase()
+          if (q && !String(row.name || '').toLowerCase().includes(q)) return false
+        }
         if (f.releaseState && row.releaseState !== f.releaseState) return false
         if (f.scheduleReleaseState) {
           if (f.scheduleReleaseState === 'NONE') {
@@ -386,15 +390,14 @@ export default defineComponent({
               value={this.filters.bizGroup}
               onUpdateValue={(v: any) => (this.filters.bizGroup = v)}
             />
-            <NSelect
+            <NAutoComplete
               size='small'
               clearable
-              filterable
               style={{ minWidth: '180px', flex: '1 1 220px' }}
               placeholder={t('project.workflow.workflow_name')}
               options={this.nameOptions}
-              value={this.filters.name}
-              onUpdateValue={(v: any) => (this.filters.name = v)}
+              value={this.filters.name || ''}
+              onUpdateValue={(v: any) => (this.filters.name = v || null)}
             />
             <NSelect
               size='small'

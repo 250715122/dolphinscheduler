@@ -48,6 +48,6 @@ export type RunPublishCategory = 0 | 1 | 2
 /** 0 online, 1 workflow offline, 2 schedule offline */
 export function statusAccent(cat: RunPublishCategory): string {
   if (cat === 1) return '#dc2626'
-  if (cat === 2) return '#ea580c'
+  if (cat === 2) return '#64748b' // schedule offline: gray
   return '#16a34a'
 }

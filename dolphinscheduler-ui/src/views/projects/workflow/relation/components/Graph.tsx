@@ -52,7 +52,7 @@ const GraphChart = defineComponent({
     const legendData = [
       { color: '#2D8DF0', name: t('project.workflow.online') },
       { color: '#f37373', name: t('project.workflow.workflow_offline') },
-      { color: '#ba3e3e', name: t('project.workflow.schedule_offline') }
+      { color: '#64748b', name: t('project.workflow.schedule_offline') }
     ]
 
     const getCategory = (schedulerStatus: number, workflowStatus: number) => {
@@ -155,7 +155,7 @@ const GraphChart = defineComponent({
             if (category === 1) {
               itemStyle.color = '#f37373'
             } else if (category === 2) {
-              itemStyle.color = '#ba3e3e'
+              itemStyle.color = '#64748b'
             } else if (category === 0) {
               itemStyle.color = '#2D8DF0'
             }

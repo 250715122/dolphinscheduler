@@ -23,7 +23,8 @@ export default {
   userPassword_tips: '请输入密码',
   login: '登录',
   loginWithOAuth2: '通过OAuth2登录',
-  ssoLogin: '单点登录',
+  ssoLogin: 'SSO单点登录',
+  ssoLoginHint: '使用公司统一身份认证登录',
   loginWithPassword: '账号密码登录',
   backToOptions: '返回登录方式'
 }

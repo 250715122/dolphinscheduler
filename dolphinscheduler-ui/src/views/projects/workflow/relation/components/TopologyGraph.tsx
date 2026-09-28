@@ -11,7 +11,7 @@ import { useI18n } from 'vue-i18n'
 import { Graph } from '@antv/x6'
 import { pastelOf, prefixColor, statusAccent } from '../utils/group'
 import { crontabToDayWindow } from '../utils/schedule'
-import type { RelationNode, RelationLink, TopoLayoutDir } from '../utils/layout'
+import type { RelationNode, RelationLink, TopoLayoutDir, TopoLayoutStyle, TopoLaneBand } from '../utils/layout'
 
 const NODE_W = 228
 const NODE_H = 96
@@ -147,7 +147,19 @@ const TopologyGraph = defineComponent({
     darkTheme: { type: Boolean as PropType<boolean>, default: false },
     layoutDir: {
       type: String as PropType<TopoLayoutDir>,
-      default: 'TB'
+      default: 'LR'
+    },
+    layoutStyle: {
+      type: String as PropType<TopoLayoutStyle>,
+      default: 'layered'
+    },
+    edgeStyle: {
+      type: String as PropType<'straight' | 'orthogonal'>,
+      default: 'straight'
+    },
+    bands: {
+      type: Array as PropType<TopoLaneBand[]>,
+      default: () => []
     }
   },
   emits: ['select', 'focus'],
@@ -218,6 +230,44 @@ const TopologyGraph = defineComponent({
         props.selectedId != null ? String(props.selectedId) : null
 
       const cells: any[] = []
+      // Swimlane backgrounds
+      ;(props.bands || []).forEach((b, i) => {
+        const fill = props.darkTheme ? 'rgba(148,163,184,0.08)' : 'rgba(148,163,184,0.10)'
+        cells.push(
+          graph!.createNode({
+            id: `band-${b.key}-${i}`,
+            shape: 'rect',
+            x: b.x,
+            y: b.y,
+            width: Math.max(b.width, 40),
+            height: Math.max(b.height, 40),
+            attrs: {
+              body: {
+                fill,
+                stroke: b.color || (props.darkTheme ? '#334155' : '#cbd5e1'),
+                strokeWidth: 1.2,
+                strokeDasharray: '5 4',
+                rx: 10,
+                ry: 10,
+                opacity: 0.95
+              },
+              label: {
+                text: props.labelShow ? b.label : '',
+                fill: props.darkTheme ? '#94a3b8' : '#64748b',
+                fontSize: 12,
+                fontWeight: 600,
+                refX: 12,
+                refY: 10,
+                textAnchor: 'start',
+                textVerticalAnchor: 'top'
+              }
+            },
+            zIndex: 0,
+            selectable: false,
+            movable: false
+          })
+        )
+      })
       ;(props.nodes || []).forEach((n: any) => {
         const id = String(n.id)
         const cat = statusCategory(n)
@@ -241,7 +291,11 @@ const TopologyGraph = defineComponent({
                   ? props.darkTheme
                     ? 'rgba(148,163,184,0.12)'
                     : 'rgba(148,163,184,0.10)'
-                  : pastelOf(bizColor),
+                  : cat === 2
+                    ? props.darkTheme
+                      ? 'rgba(100,116,139,0.22)'
+                      : 'rgba(100,116,139,0.14)'
+                    : pastelOf(bizColor),
                 stroke: id === selected
                   ? '#2563eb'
                   : n.external
@@ -264,7 +318,10 @@ const TopologyGraph = defineComponent({
                 }
               }
             },
-            ports: portsForDir(props.layoutDir),
+            ports:
+              props.layoutStyle === 'radial'
+                ? { groups: {}, items: [] }
+                : portsForDir(props.layoutDir),
             zIndex: 2
           })
         )
@@ -286,8 +343,22 @@ const TopologyGraph = defineComponent({
           graph!.createEdge({
             id: `e-${s}-${tg}-${idx}`,
             shape: EDGE_NAME,
-            source: { cell: s, port: 'out' },
-            target: { cell: tg, port: 'in' },
+            source:
+              props.layoutStyle === 'radial'
+                ? { cell: s }
+                : { cell: s, port: 'out' },
+            target:
+              props.layoutStyle === 'radial'
+                ? { cell: tg }
+                : { cell: tg, port: 'in' },
+            router:
+              props.layoutStyle === 'radial' || props.edgeStyle === 'straight'
+                ? { name: 'normal' }
+                : { name: 'manhattan', args: { padding: 12 } },
+            connector:
+              props.layoutStyle === 'radial' || props.edgeStyle === 'straight'
+                ? { name: 'normal' }
+                : { name: 'rounded', args: { radius: 12 } },
             labels:
               external && edgeLabel && props.labelShow
                 ? [
@@ -350,10 +421,16 @@ const TopologyGraph = defineComponent({
         panning: true,
         mousewheel: {
           enabled: true,
-          modifiers: [],
-          factor: 1.08,
-          maxScale: 2.2,
-          minScale: 0.25
+          // Require Ctrl/Meta so plain scroll does not steal page scroll;
+          // empty modifiers also ignore Ctrl+wheel in X6 (user complaint).
+          modifiers: ['ctrl', 'meta'],
+          factor: 1.1,
+          maxScale: 3,
+          minScale: 0.2
+        },
+        scaling: {
+          min: 0.2,
+          max: 3
         },
         connecting: {
           connectionPoint: 'anchor',
@@ -374,6 +451,16 @@ const TopologyGraph = defineComponent({
       })
       graph.on('node:click', ({ node }) => emit('select', node.id))
       graph.on('node:dblclick', ({ node }) => emit('focus', node.id))
+      // Keep Ctrl/Meta+wheel on the canvas (avoid browser page zoom)
+      domRef.value.addEventListener(
+        'wheel',
+        (e: WheelEvent) => {
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault()
+          }
+        },
+        { passive: false }
+      )
       return graph
     }
 
@@ -433,10 +520,13 @@ const TopologyGraph = defineComponent({
       () => [
         props.nodes,
         props.links,
+        props.bands,
         props.selectedId,
         props.highlightIds,
         props.labelShow,
-        props.layoutDir
+        props.layoutDir,
+        props.layoutStyle,
+        props.edgeStyle
       ],
       () => {
         if (!graph) syncSizeAndRender()

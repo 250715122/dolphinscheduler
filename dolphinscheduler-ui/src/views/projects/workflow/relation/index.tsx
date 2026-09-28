@@ -43,6 +43,7 @@ const workflowRelation = defineComponent({
       getOneWorkflow,
       getWorkflowList,
       visibleNodes,
+      layoutBands,
       visibleLinks,
       highlightIds,
       selectedNode,
@@ -233,6 +234,7 @@ const workflowRelation = defineComponent({
       expandFilter,
       ...toRefs(variables),
       visibleNodes,
+      layoutBands,
       visibleLinks,
       highlightIds,
       selectedNode,
@@ -453,47 +455,120 @@ const workflowRelation = defineComponent({
                       </NRadioButton>
                     </NRadioGroup>
                     {this.viewMode === 'topology' ? (
-                      <NSelect
-                        size='small'
-                        style={{ width: '168px' }}
-                        value={this.layoutDir}
-                        options={[
-                          {
-                            label: t('project.workflow.relation_layout_lr'),
-                            value: 'LR'
-                          },
-                          {
-                            label: t('project.workflow.relation_layout_tb'),
-                            value: 'TB'
-                          },
-                          {
-                            label: t('project.workflow.relation_layout_rl'),
-                            value: 'RL'
-                          },
-                          {
-                            label: t('project.workflow.relation_layout_bt'),
-                            value: 'BT'
-                          }
-                        ]}
-                        onUpdateValue={(v: any) => {
-                          if (!v) return
-                          this.layoutDir = v
-                          this.fitToken = this.fitToken + 1
-                        }}
-                      />
+                      <>
+                        <NSelect
+                          size='small'
+                          style={{ width: '168px' }}
+                          value={this.layoutStyle}
+                          options={[
+                            {
+                              label: t('project.workflow.relation_style_layered'),
+                              value: 'layered'
+                            },
+                            {
+                              label: t('project.workflow.relation_style_compact'),
+                              value: 'compact'
+                            },
+                            {
+                              label: t('project.workflow.relation_style_swimlane'),
+                              value: 'swimlane'
+                            },
+                            {
+                              label: t('project.workflow.relation_style_radial'),
+                              value: 'radial'
+                            }
+                          ]}
+                          onUpdateValue={(v: any) => {
+                            if (!v) return
+                            this.layoutStyle = v
+                            this.fitToken = this.fitToken + 1
+                          }}
+                        />
+                        <NSelect
+                          size='small'
+                          style={{ width: '168px' }}
+                          disabled={this.layoutStyle === 'radial'}
+                          value={this.layoutDir}
+                          options={[
+                            {
+                              label: t('project.workflow.relation_layout_lr'),
+                              value: 'LR'
+                            },
+                            {
+                              label: t('project.workflow.relation_layout_tb'),
+                              value: 'TB'
+                            },
+                            {
+                              label: t('project.workflow.relation_layout_rl'),
+                              value: 'RL'
+                            },
+                            {
+                              label: t('project.workflow.relation_layout_bt'),
+                              value: 'BT'
+                            }
+                          ]}
+                          onUpdateValue={(v: any) => {
+                            if (!v) return
+                            this.layoutDir = v
+                            this.fitToken = this.fitToken + 1
+                          }}
+                        />
+                        <NSelect
+                          size='small'
+                          style='width: 110px'
+                          value={this.edgeStyle}
+                          options={[
+                            {
+                              label: t('project.workflow.relation_edge_straight'),
+                              value: 'straight'
+                            },
+                            {
+                              label: t('project.workflow.relation_edge_orthogonal'),
+                              value: 'orthogonal'
+                            }
+                          ]}
+                          onUpdateValue={(v: any) => {
+                            if (!v) return
+                            this.edgeStyle = v
+                            this.fitToken = this.fitToken + 1
+                          }}
+                        />
+                      </>
                     ) : null}
                   </div>
                   <div class={styles.legend}>
-                    <span>
+                    <span
+                      class={[
+                        styles.legendItem,
+                        this.metricActive('online') ? styles.legendActive : ''
+                      ].join(' ')}
+                      onClick={() => this.handleMetricClick('online')}
+                    >
                       <i class={styles.dot} style='background:#16a34a' />
                       {t('project.workflow.online')}
                     </span>
-                    <span>
+                    <span
+                      class={[
+                        styles.legendItem,
+                        this.metricActive('workflow_offline')
+                          ? styles.legendActive
+                          : ''
+                      ].join(' ')}
+                      onClick={() => this.handleMetricClick('workflow_offline')}
+                    >
                       <i class={styles.dot} style='background:#dc2626' />
                       {t('project.workflow.workflow_offline')}
                     </span>
-                    <span>
-                      <i class={styles.dot} style='background:#ea580c' />
+                    <span
+                      class={[
+                        styles.legendItem,
+                        this.metricActive('schedule_offline')
+                          ? styles.legendActive
+                          : ''
+                      ].join(' ')}
+                      onClick={() => this.handleMetricClick('schedule_offline')}
+                    >
+                      <i class={styles.dot} style='background:#64748b' />
                       {t('project.workflow.schedule_offline')}
                     </span>
                     <span>{t('project.workflow.relation_focus_hint')}</span>
@@ -504,12 +579,15 @@ const workflowRelation = defineComponent({
                     <TopologyGraph
                       nodes={this.visibleNodes}
                       links={this.visibleLinks}
+                      bands={this.layoutBands}
                       selectedId={this.selectedId}
                       highlightIds={this.highlightIds}
                       labelShow={this.labelShow}
                       fitToken={this.fitToken}
                       darkTheme={this.themeStore.darkTheme}
                       layoutDir={this.layoutDir}
+                      layoutStyle={this.layoutStyle}
+                      edgeStyle={this.edgeStyle}
                       onSelect={(id: any) => { if (id != null) this.selectNode(id, { keep: true }) }}
                       onFocus={(id: any) => this.focusNeighborhood(id, 2)}
                     />

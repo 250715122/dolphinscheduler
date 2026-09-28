@@ -33,14 +33,15 @@
     width: 400px;
     min-height: 260px;
     background: #fff;
-    border-radius: 3px;
-    box-shadow: 0 2px 25px 0 rgb(0 0 0 / 30%);
+    border-radius: 12px;
+    box-shadow: 0 8px 28px rgb(0 16 40 / 18%);
 
     .logo {
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding-top: 30px;
+      padding-top: 36px;
 
       .logo-img {
         width: 280px;
@@ -48,10 +49,28 @@
         background: url('../../assets/images/logo-light.svg') 50% no-repeat;
         margin: 0 auto;
       }
+
+      .logo-hint {
+        margin-top: 10px;
+        font-size: 13px;
+        line-height: 1.4;
+        color: #6b7280;
+        text-align: center;
+      }
     }
 
     .form-model {
-      padding: 30px 20px;
+      padding: 24px 28px 32px;
+    }
+
+    .btn-login-sso {
+      height: 42px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .btn-login-password-option {
+      height: 42px;
     }
 
     .oauth2-provider {

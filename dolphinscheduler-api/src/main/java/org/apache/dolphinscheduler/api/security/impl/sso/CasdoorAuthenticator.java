@@ -87,6 +87,10 @@ public class CasdoorAuthenticator extends AbstractSsoAuthenticator {
         }
         // one-time use
         request.getSession().removeAttribute(Constants.SSO_LOGIN_USER_STATE);
+        if (servletRequestAttributes.getResponse() != null) {
+            servletRequestAttributes.getResponse().addHeader("Set-Cookie",
+                    Constants.SSO_LOGIN_USER_STATE + "=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax");
+        }
         // Check state to protect from CSRF attack
         if (originalState == null || state == null
                 || !MessageDigest.isEqual(originalState.getBytes(java.nio.charset.StandardCharsets.UTF_8),

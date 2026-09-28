@@ -13,8 +13,9 @@ import type {
 } from '@/service/modules/lineages/types'
 import { extractPrefix } from './utils/group'
 import {
-  buildTopoPositions,
   type TopoLayoutDir,
+  type TopoLayoutStyle,
+  buildTopoLayout,
   neighbors,
   computeSummary,
   type RelationLink,
@@ -39,8 +40,11 @@ export function useRelation() {
     loading: false,
     selectedId: null as null | string | number,
     viewMode: 'topology' as ViewMode,
-    /** Default TB: siblings spread horizontally (landscape-friendly). */
-    layoutDir: 'TB' as TopoLayoutDir,
+    /** Default LR: left→right flow, siblings stacked vertically. */
+    layoutDir: 'LR' as TopoLayoutDir,
+    layoutStyle: 'layered' as TopoLayoutStyle,
+    /** straight = direct lines (easier to see upstream); orthogonal = manhattan bends */
+    edgeStyle: 'straight' as 'straight' | 'orthogonal',
     filterCollapsed: true,
     keyword: '',
     groups: [] as string[],
@@ -348,7 +352,7 @@ export function useRelation() {
     return new Set<string>([id, ...upstream, ...downstream])
   })
 
-  const visibleNodes = computed(() => {
+  const topoLayout = computed(() => {
     let list = filteredNodes.value
     if (focusIds.value) {
       list = list.filter((n) => focusIds.value!.has(String(n.id)))
@@ -357,8 +361,16 @@ export function useRelation() {
     const links = variables.rawLinks.filter(
       (l) => ids.has(String(l.source)) && ids.has(String(l.target))
     )
-    return buildTopoPositions(list, links, variables.layoutDir)
+    return buildTopoLayout(
+      list,
+      links,
+      variables.layoutDir,
+      variables.layoutStyle
+    )
   })
+
+  const visibleNodes = computed(() => topoLayout.value.nodes)
+  const layoutBands = computed(() => topoLayout.value.bands)
 
   const visibleLinks = computed(() => {
     const ids = new Set(visibleNodes.value.map((n) => String(n.id)))
@@ -512,6 +524,7 @@ export function useRelation() {
     getOneWorkflow,
     getWorkflowList,
     visibleNodes,
+    layoutBands,
     visibleLinks,
     highlightIds,
     selectedNode,

@@ -177,15 +177,26 @@ public class LoginController extends BaseController {
             // Reuse existing OAuth state so a remount/callback does not mint a mismatched state.
             String state = (String) session.getAttribute(Constants.SSO_LOGIN_USER_STATE);
             if (state == null) {
+                Cookie[] cookies = request.getCookies();
+                if (cookies != null) {
+                    for (Cookie cookie : cookies) {
+                        if (Constants.SSO_LOGIN_USER_STATE.equals(cookie.getName())
+                                && cookie.getValue() != null && !cookie.getValue().isEmpty()) {
+                            state = cookie.getValue();
+                            session.setAttribute(Constants.SSO_LOGIN_USER_STATE, state);
+                            break;
+                        }
+                    }
+                }
+            }
+            if (state == null) {
                 state = UUID.randomUUID().toString();
                 session.setAttribute(Constants.SSO_LOGIN_USER_STATE, state);
             }
-            // Cookie backup: DingTalk/Casdoor cross-site round-trip may drop HttpSession
-            Cookie stateCookie = new Cookie(Constants.SSO_LOGIN_USER_STATE, state);
-            stateCookie.setPath("/");
-            stateCookie.setHttpOnly(true);
-            stateCookie.setMaxAge(600);
-            response.addCookie(stateCookie);
+            // Cookie backup with SameSite=Lax for Casdoor/DingTalk top-level redirects
+            response.addHeader("Set-Cookie",
+                    Constants.SSO_LOGIN_USER_STATE + "=" + state
+                            + "; Path=/; Max-Age=600; HttpOnly; SameSite=Lax");
             return Result.success(((AbstractSsoAuthenticator) authenticator).getSignInUrl(state));
         }
         return Result.success();

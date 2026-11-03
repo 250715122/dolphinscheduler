@@ -863,6 +863,15 @@ export function useDashboard(options: DashboardOptions = {}) {
     if (card.clickTab) workbenchTab.value = card.clickTab
   }
 
+  // task-name pick from the search dropdown: filter task instances by that name
+  const filterByTaskName = (name: string) => {
+    userPickedTab.value = true
+    scope.entityType = 'TASK'
+    if (workbenchTab.value === 'workflow') workbenchTab.value = 'all'
+    keyword.value = name
+    instancePage.value = 1
+  }
+
   const openInstance = (row: InstanceRow) => {
     const entity =
       row.entityType ||
@@ -964,6 +973,7 @@ export function useDashboard(options: DashboardOptions = {}) {
     statusChips,
     compactMode,
     workbenchTab,
+    filterByTaskName,
     instances,
     instanceTotal,
     instancePage,

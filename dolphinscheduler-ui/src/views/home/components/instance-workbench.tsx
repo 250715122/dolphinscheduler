@@ -43,7 +43,7 @@ const InstanceWorkbench = defineComponent({
     scopeHint: { type: String as PropType<string>, default: '' },
     entityLabel: { type: String as PropType<string>, default: '' }
   },
-  emits: ['update:keyword', 'update:page', 'open'],
+  emits: ['update:keyword', 'update:page', 'open', 'filter-task'],
   setup(props, { emit }) {
     const { t } = useI18n()
     const router = useRouter()
@@ -88,6 +88,16 @@ const InstanceWorkbench = defineComponent({
     }
     onBeforeUnmount(() => clearTimeout(timer))
 
+    // click task name: filter the instance list by this task name
+    const filterByTask = (hit: TaskHit) => {
+      clearTimeout(timer)
+      seq++
+      hits.value = []
+      searching.value = false
+      emit('update:keyword', hit.taskName)
+      emit('filter-task', hit.taskName)
+    }
+
     const gotoTask = (hit: TaskHit) => {
       router.push({
         path: `/projects/${hit.projectCode}/workflow/definitions/${hit.workflowCode}`,
@@ -110,11 +120,18 @@ const InstanceWorkbench = defineComponent({
         'div',
         {
           style:
-            'display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 12px;cursor:default',
+            'display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 12px',
           onMousedown: (e: MouseEvent) => e.preventDefault()
         },
         [
-          h('div', { style: 'min-width:0;flex:1' }, [
+          h(
+            'div',
+            {
+              style: 'min-width:0;flex:1;cursor:pointer',
+              title: t('home.ops_task_filter_tip'),
+              onClick: () => filterByTask(hit)
+            },
+            [
             h(
               'div',
               {

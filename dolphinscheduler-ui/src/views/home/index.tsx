@@ -51,6 +51,7 @@ export default defineComponent({
       asOf,
       metrics,
       workbenchTab,
+      filterByTaskName,
       instances,
       instanceTotal,
       instancePage,
@@ -225,6 +226,7 @@ export default defineComponent({
                     ? t('home.ops_entity_workflow')
                     : t('home.ops_entity_task')
                 }
+                onFilter-task={(name: string) => filterByTaskName(name)}
                 onUpdate:keyword={(v: string) => {
                   this.keyword = v
                 }}

@@ -27,6 +27,7 @@ import {
 import { useDashboard } from './composables/use-dashboard'
 import MetricCard from './components/metric-card'
 import InstanceWorkbench from './components/instance-workbench'
+import TaskFilter from './components/task-filter'
 import UpcomingSchedules from './components/upcoming-schedules'
 import ServiceSummary from './components/service-summary'
 import TrendPanel from './components/trend-panel'
@@ -51,7 +52,8 @@ export default defineComponent({
       asOf,
       metrics,
       workbenchTab,
-      filterByTaskName,
+      taskFilter,
+      setTaskFilter,
       instances,
       instanceTotal,
       instancePage,
@@ -144,6 +146,8 @@ export default defineComponent({
                 {t('home.ops_project_locked')}: {scope.projectName || scope.projectCode}
               </span>
             ) : (
+              <>
+                <span class={styles.headerMeta}>{t('home.ops_filter_project')}</span>
               <NSelect
                 style='width: 180px'
                 size='small'
@@ -155,7 +159,10 @@ export default defineComponent({
                     projects.find((p: any) => p.value === v)?.label || ''
                 }}
               />
+              </>
             )}
+            <span class={styles.headerMeta}>{t('home.ops_filter_task')}</span>
+            <TaskFilter value={taskFilter} onUpdate:value={setTaskFilter} />
             <NSelect
               style='width: 130px'
               size='small'
@@ -226,7 +233,6 @@ export default defineComponent({
                     ? t('home.ops_entity_workflow')
                     : t('home.ops_entity_task')
                 }
-                onFilter-task={(name: string) => filterByTaskName(name)}
                 onUpdate:keyword={(v: string) => {
                   this.keyword = v
                 }}

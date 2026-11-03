@@ -158,6 +158,7 @@ export function useDashboard(options: DashboardOptions = {}) {
     databaseOk: null
   })
   const keyword = ref('')
+  const taskFilter = ref('')
   const trendPoints = ref<TrendPoint[]>([])
   const trendMode = ref<TrendMode>('task')
   const durationRows = ref<InstanceRow[]>([])
@@ -510,7 +511,7 @@ export function useDashboard(options: DashboardOptions = {}) {
               {
                 pageNo: 1,
                 pageSize: 30,
-                searchVal: keyword.value || undefined,
+                searchVal: taskFilter.value || keyword.value || undefined,
                 stateType: st || undefined,
                 startDate: usePeriod ? dateParams.value.startDate : undefined,
                 endDate: usePeriod ? dateParams.value.endDate : undefined
@@ -863,12 +864,14 @@ export function useDashboard(options: DashboardOptions = {}) {
     if (card.clickTab) workbenchTab.value = card.clickTab
   }
 
-  // task-name pick from the search dropdown: filter task instances by that name
-  const filterByTaskName = (name: string) => {
+  // header task filter: filter task instances by task name
+  const setTaskFilter = (name: string) => {
     userPickedTab.value = true
-    scope.entityType = 'TASK'
-    if (workbenchTab.value === 'workflow') workbenchTab.value = 'all'
-    keyword.value = name
+    taskFilter.value = name
+    if (name) {
+      scope.entityType = 'TASK'
+      if (workbenchTab.value === 'workflow') workbenchTab.value = 'all'
+    }
     instancePage.value = 1
   }
 
@@ -954,7 +957,7 @@ export function useDashboard(options: DashboardOptions = {}) {
   )
 
   watch(
-    () => [workbenchTab.value, keyword.value],
+    () => [workbenchTab.value, keyword.value, taskFilter.value],
     () => loadInstances()
   )
 
@@ -973,7 +976,8 @@ export function useDashboard(options: DashboardOptions = {}) {
     statusChips,
     compactMode,
     workbenchTab,
-    filterByTaskName,
+    taskFilter,
+    setTaskFilter,
     instances,
     instanceTotal,
     instancePage,

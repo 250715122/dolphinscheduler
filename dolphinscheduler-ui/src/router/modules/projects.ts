@@ -191,6 +191,17 @@ export default {
       }
     },
     {
+      path: '/projects/:projectCode/workflow-recycle',
+      name: 'workflow-recycle',
+      component: components['projects-recycle'],
+      meta: {
+        title: '回收站',
+        activeMenu: 'projects',
+        showSide: true,
+        auth: []
+      }
+    },
+    {
       path: '/projects/:projectCode/workflow-definition/tree/:definitionCode',
       name: 'workflow-definition-tree',
       component: components['projects-workflow-definition-tree'],

@@ -122,6 +122,13 @@ export default {
     cluster_config_tips: '请输入集群配置',
     cluster_description_tips: '请输入集群描述'
   },
+  recycle_setting_title: '工作流回收站设置',
+  recycle_setting_tip: '项目内删除的工作流会先进入回收站，超过保留天数后自动彻底删除。修改后立即对所有项目生效，已在回收站的工作流按新的天数重新计算到期时间。',
+  recycle_setting_label: '回收站保留',
+  recycle_setting_unit: '天',
+  recycle_setting_save: '保存',
+  recycle_setting_saved: '已保存',
+  recycle_setting_invalid: '请输入 1 ~ 3650 之间的天数',
   token: {
     create_token: '创建令牌',
     edit_token: '编辑令牌',

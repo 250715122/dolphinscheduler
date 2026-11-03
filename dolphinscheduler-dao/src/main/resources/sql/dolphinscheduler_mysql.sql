@@ -1394,3 +1394,29 @@ CREATE TABLE `t_ds_jdbc_registry_data_change_event`
     PRIMARY KEY (`id`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8;
+
+-- workflow recycle bin: snapshot of a deleted workflow definition (DAG json) kept until retention expires
+CREATE TABLE IF NOT EXISTS `t_ds_workflow_recycle` (
+  `id` int NOT NULL AUTO_INCREMENT COMMENT "key",
+  `workflow_code` bigint NOT NULL COMMENT "workflow definition code",
+  `workflow_name` varchar(255) DEFAULT NULL COMMENT "workflow name",
+  `project_code` bigint NOT NULL COMMENT "project code",
+  `description` text COMMENT "description",
+  `task_count` int DEFAULT 0 COMMENT "task count",
+  `owner_user_id` int DEFAULT NULL COMMENT "original owner",
+  `delete_user_id` int DEFAULT NULL COMMENT "who deleted it",
+  `dag_json` longtext COMMENT "DagDataSchedule json snapshot",
+  `delete_time` datetime DEFAULT NULL COMMENT "delete time",
+  PRIMARY KEY (`id`),
+  KEY `workflow_recycle_idx_project_code` (`project_code`),
+  KEY `workflow_recycle_idx_delete_time` (`delete_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+-- global key/value settings editable in Security Center
+CREATE TABLE IF NOT EXISTS `t_ds_system_setting` (
+  `setting_key` varchar(64) NOT NULL COMMENT "key",
+  `setting_value` varchar(255) DEFAULT NULL COMMENT "value",
+  `update_time` datetime DEFAULT NULL COMMENT "update time",
+  PRIMARY KEY (`setting_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+

@@ -1,9 +1,34 @@
-import { defineComponent, PropType, h } from 'vue'
-import { NButton, NDataTable, NInput, NPagination, NTag } from 'naive-ui'
+import {
+  computed,
+  defineComponent,
+  PropType,
+  h,
+  onBeforeUnmount,
+  ref
+} from 'vue'
+import { useRouter } from 'vue-router'
+import {
+  NAutoComplete,
+  NButton,
+  NDataTable,
+  NPagination,
+  NTag
+} from 'naive-ui'
 import { useI18n } from 'vue-i18n'
+import { axios } from '@/service/service'
 import styles from '../styles/dashboard.module.scss'
 import { GROUP_COLORS, type DisplayGroup } from '../adapters/status-groups'
 import type { InstanceRow, WorkbenchTab } from '../types/dashboard'
+
+interface TaskHit {
+  taskCode: string
+  taskName: string
+  taskType: string
+  workflowCode: string
+  workflowName: string
+  projectCode: string
+  projectName: string
+}
 
 const InstanceWorkbench = defineComponent({
   name: 'OpsInstanceWorkbench',
@@ -21,11 +46,106 @@ const InstanceWorkbench = defineComponent({
   emits: ['update:keyword', 'update:page', 'open'],
   setup(props, { emit }) {
     const { t } = useI18n()
+    const router = useRouter()
 
     const groupLabel = (g: DisplayGroup, raw: string) => {
       const key = `home.ops_group_${g}`
       const mapped = t(key)
       return mapped === key ? raw : mapped
+    }
+
+    // ---- global task search (task definitions, across authorized projects) ----
+    const hits = ref<TaskHit[]>([])
+    const searching = ref(false)
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let seq = 0
+
+    const searchTasks = (kw: string) => {
+      clearTimeout(timer)
+      const key = kw.trim()
+      if (key.length < 2) {
+        hits.value = []
+        searching.value = false
+        return
+      }
+      searching.value = true
+      timer = setTimeout(async () => {
+        const mine = ++seq
+        try {
+          const res = (await axios({
+            url: '/task-search',
+            method: 'get',
+            params: { keyword: key, limit: 20 }
+          })) as unknown as TaskHit[]
+          // drop out-of-order responses
+          if (mine === seq) hits.value = res || []
+        } catch (e) {
+          if (mine === seq) hits.value = []
+        } finally {
+          if (mine === seq) searching.value = false
+        }
+      }, 250)
+    }
+    onBeforeUnmount(() => clearTimeout(timer))
+
+    const gotoTask = (hit: TaskHit) => {
+      router.push({
+        path: `/projects/${hit.projectCode}/workflow/definitions/${hit.workflowCode}`,
+        query: { projectName: hit.projectName, taskCode: hit.taskCode }
+      })
+    }
+
+    const options = computed(() =>
+      hits.value.map((hit) => ({
+        label: hit.taskName,
+        // unique per task+workflow so a task name reused in several workflows stays selectable
+        value: `${hit.workflowCode}:${hit.taskCode}`,
+        hit
+      }))
+    )
+
+    const renderOption = (info: { node: any; option: any }) => {
+      const hit: TaskHit = info.option.hit
+      return h(
+        'div',
+        {
+          style:
+            'display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 12px;cursor:default',
+          onMousedown: (e: MouseEvent) => e.preventDefault()
+        },
+        [
+          h('div', { style: 'min-width:0;flex:1' }, [
+            h(
+              'div',
+              {
+                style:
+                  'font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+              },
+              hit.taskName
+            ),
+            h(
+              'div',
+              {
+                style:
+                  'font-size:12px;opacity:.65;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+              },
+              `${hit.projectName} / ${hit.workflowName}`
+            )
+          ]),
+          h(
+            'a',
+            {
+              class: styles.linkBtn,
+              style: 'font-size:13px;flex:none',
+              onClick: (e: MouseEvent) => {
+                e.stopPropagation()
+                gotoTask(hit)
+              }
+            },
+            t('home.ops_goto')
+          )
+        ]
+      )
     }
 
     return () => (
@@ -35,13 +155,22 @@ const InstanceWorkbench = defineComponent({
             <h3 class={styles.cardTitle}>{t('home.ops_workbench')}</h3>
             <p class={styles.cardDesc}>{props.scopeHint}</p>
           </div>
-          <NInput
+          <NAutoComplete
             value={props.keyword}
             size='small'
             clearable
-            style='width: 200px'
+            style='width: 300px'
+            options={options.value}
+            loading={searching.value}
+            blur-after-select={false}
+            // the dropdown is only a task finder; picking a row must not rewrite the keyword
+            onSelect={() => undefined}
+            renderOption={renderOption as any}
             placeholder={t('home.ops_search_instance')}
-            onUpdateValue={(v: string) => emit('update:keyword', v)}
+            onUpdateValue={(v: string) => {
+              emit('update:keyword', v)
+              searchTasks(v || '')
+            }}
           />
         </div>
         <div class={styles.panelBody}>

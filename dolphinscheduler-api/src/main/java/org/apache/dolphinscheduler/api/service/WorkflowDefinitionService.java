@@ -271,6 +271,15 @@ public interface WorkflowDefinitionService {
                                                  MultipartFile file);
 
     /**
+     * Restore a workflow from a recycle-bin snapshot. Keeps the original name when free.
+     * Fills {@code result} with status/msg, same convention as import.
+     */
+    void restoreFromSnapshot(User loginUser,
+                             long projectCode,
+                             Map<String, Object> result,
+                             org.apache.dolphinscheduler.api.dto.DagDataSchedule dagDataSchedule);
+
+    /**
      * import sql workflow definition
      *
      * @param loginUser   login user

@@ -26,6 +26,7 @@ import Locales from '../locales'
 import Timezone from '../timezone'
 import User from '../user'
 import Theme from '../theme'
+import DevSpec from '../dev-spec'
 
 const Navbar = defineComponent({
   name: 'Navbar',
@@ -83,6 +84,7 @@ const Navbar = defineComponent({
           />
         </div>
         <div class={styles.settings}>
+          <DevSpec />
           <NButton quaternary onClick={this.handleUISettingClick}>
             {{
               icon: () => (

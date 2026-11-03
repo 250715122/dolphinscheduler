@@ -208,6 +208,9 @@ public class WorkflowDefinitionServiceImpl extends BaseServiceImpl implements Wo
     private ScheduleMapper scheduleMapper;
 
     @Autowired
+    private org.apache.dolphinscheduler.dao.mapper.WorkflowRecycleMapper workflowRecycleMapper;
+
+    @Autowired
     private ProcessService processService;
 
     @Autowired
@@ -1067,6 +1070,49 @@ public class WorkflowDefinitionServiceImpl extends BaseServiceImpl implements Wo
         }
     }
 
+    /**
+     * Keep a full copy (workflow, tasks, relations, schedule) of a workflow that is about to be deleted.
+     * The same DagDataSchedule json as the export feature is used, so restore reuses the import path.
+     */
+    private void saveToRecycleBin(User loginUser, WorkflowDefinition workflowDefinition, Schedule scheduleObj) {
+        try {
+            DagDataSchedule dagDataSchedule = new DagDataSchedule(processService.genDagData(workflowDefinition));
+            if (scheduleObj != null) {
+                // work on a copy: the caller still needs the real release state for its ONLINE guard
+                Schedule scheduleCopy = JSONUtils.parseObject(JSONUtils.toJsonString(scheduleObj), Schedule.class);
+                if (scheduleCopy != null) {
+                    // a restored schedule must never come back online by itself
+                    scheduleCopy.setReleaseState(ReleaseState.OFFLINE);
+                    dagDataSchedule.setSchedule(scheduleCopy);
+                }
+            }
+            org.apache.dolphinscheduler.dao.entity.WorkflowRecycle recycle =
+                    new org.apache.dolphinscheduler.dao.entity.WorkflowRecycle();
+            recycle.setWorkflowCode(workflowDefinition.getCode());
+            recycle.setWorkflowName(workflowDefinition.getName());
+            recycle.setProjectCode(workflowDefinition.getProjectCode());
+            recycle.setDescription(workflowDefinition.getDescription());
+            recycle.setTaskCount(
+                    dagDataSchedule.getTaskDefinitionList() == null ? 0
+                            : dagDataSchedule.getTaskDefinitionList().size());
+            recycle.setOwnerUserId(workflowDefinition.getUserId());
+            recycle.setDeleteUserId(loginUser.getId());
+            recycle.setDagJson(JSONUtils.toJsonString(dagDataSchedule));
+            recycle.setDeleteTime(new Date());
+            // a failed delete can be retried: keep one snapshot per workflow code
+            workflowRecycleMapper.delete(
+                    new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<org.apache.dolphinscheduler.dao.entity.WorkflowRecycle>()
+                            .eq("workflow_code", workflowDefinition.getCode()));
+            workflowRecycleMapper.insert(recycle);
+            log.info("Workflow {} moved to recycle bin, recycleId:{}", workflowDefinition.getCode(),
+                    recycle.getId());
+        } catch (Exception e) {
+            log.error("Save workflow {} to recycle bin failed, delete aborted", workflowDefinition.getCode(), e);
+            throw new ServiceException(Status.INTERNAL_SERVER_ERROR_ARGS,
+                    "save to recycle bin failed: " + e.getMessage());
+        }
+    }
+
     public void deleteWorkflowDefinitionByCode(User loginUser, long code) {
         WorkflowDefinition workflowDefinition = workflowDefinitionDao.queryByCode(code)
                 .orElseThrow(() -> new ServiceException(WORKFLOW_DEFINITION_NOT_EXIST, String.valueOf(code)));
@@ -1084,6 +1130,10 @@ public class WorkflowDefinitionServiceImpl extends BaseServiceImpl implements Wo
 
         // get the timing according to the workflow definition
         Schedule scheduleObj = scheduleMapper.queryByWorkflowDefinitionCode(code);
+        // Snapshot BEFORE anything is removed so the workflow can be restored from the recycle bin.
+        // If the snapshot fails we abort: never delete something we could not keep a copy of.
+        saveToRecycleBin(loginUser, workflowDefinition, scheduleObj);
+
         if (scheduleObj != null) {
             if (scheduleObj.getReleaseState() == ReleaseState.OFFLINE) {
                 int delete = scheduleMapper.deleteById(scheduleObj.getId());
@@ -1243,6 +1293,16 @@ public class WorkflowDefinitionServiceImpl extends BaseServiceImpl implements Wo
             }
         }
         return result;
+    }
+
+    @Override
+    @Transactional
+    public void restoreFromSnapshot(User loginUser, long projectCode, Map<String, Object> result,
+                                    DagDataSchedule dagDataSchedule) {
+        if (!checkAndImport(loginUser, projectCode, result, dagDataSchedule, true)) {
+            // checkAndImport only fills result; make sure the caller sees a non-success state
+            result.putIfAbsent(Constants.STATUS, Status.IMPORT_WORKFLOW_DEFINE_ERROR);
+        }
     }
 
     @Override
@@ -1460,6 +1520,18 @@ public class WorkflowDefinitionServiceImpl extends BaseServiceImpl implements Wo
                                      long projectCode,
                                      Map<String, Object> result,
                                      DagDataSchedule dagDataSchedule) {
+        return checkAndImport(loginUser, projectCode, result, dagDataSchedule, false);
+    }
+
+    /**
+     * @param keepName true: keep the original name when it is free (used by recycle-bin restore),
+     *                 falls back to a numbered name on conflict; false: legacy import naming
+     */
+    protected boolean checkAndImport(User loginUser,
+                                     long projectCode,
+                                     Map<String, Object> result,
+                                     DagDataSchedule dagDataSchedule,
+                                     boolean keepName) {
         if (!checkImportanceParams(dagDataSchedule, result)) {
             return false;
         }
@@ -1467,7 +1539,8 @@ public class WorkflowDefinitionServiceImpl extends BaseServiceImpl implements Wo
 
         // generate import workflowDefinitionName
         String workflowDefinitionName = recursionWorkflowDefinitionName(projectCode, workflowDefinition.getName(), 1);
-        String importWorkflowDefinitionName = getNewName(workflowDefinitionName, IMPORT_SUFFIX);
+        String importWorkflowDefinitionName =
+                keepName ? workflowDefinitionName : getNewName(workflowDefinitionName, IMPORT_SUFFIX);
         // unique check
         Map<String, Object> checkResult =
                 verifyWorkflowDefinitionName(loginUser, projectCode, importWorkflowDefinitionName, 0);

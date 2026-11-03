@@ -32,6 +32,7 @@ import {
   PartitionOutlined,
   SettingOutlined,
   FileSearchOutlined,
+  DeleteOutlined,
   AppstoreOutlined,
   UsergroupAddOutlined,
   UserAddOutlined,
@@ -140,6 +141,12 @@ export function useDataList() {
                 payload: { projectName: projectName }
               }
             ]
+          },
+          {
+            label: t('menu.workflow_recycle_bin'),
+            key: `/projects/${projectCode}/workflow-recycle`,
+            icon: renderIcon(DeleteOutlined),
+            payload: { projectName: projectName }
           },
           {
             label: t('menu.task'),
@@ -309,6 +316,11 @@ export function useDataList() {
                   label: t('menu.token_manage'),
                   key: '/security/token-manage',
                   icon: renderIcon(SafetyOutlined)
+                },
+                {
+                  label: t('menu.workflow_recycle_setting'),
+                  key: '/security/workflow-recycle-setting',
+                  icon: renderIcon(DeleteOutlined)
                 }
               ]
             : [

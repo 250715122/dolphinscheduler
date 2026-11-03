@@ -1030,6 +1030,23 @@ export default {
     is_production_tips: 'is production',
     json_format_tips: 'Json parameters format is abnormal'
   },
+  recycle: {
+    name: 'Workflow Name',
+    task_count: 'Tasks',
+    delete_time: 'Deleted At',
+    remaining: 'Retention Left',
+    days: '{n} day(s)',
+    operation: 'Operation',
+    restore: 'Restore',
+    restore_confirm:
+      'Restore this workflow? It comes back offline and run instances are not restored.',
+    restore_success: 'Restored. Check it in Workflow Definition.',
+    purge: 'Delete Forever',
+    purge_confirm: 'This cannot be undone. Continue?',
+    purge_success: 'Deleted permanently',
+    search: 'Workflow name',
+    tip: 'Deleted workflows are kept for {n} day(s) and then removed permanently. A restored workflow and its schedule are offline, history run instances cannot be recovered, and the workflow code is regenerated.'
+  },
   menu: {
     fav: 'Favorites',
     universal: 'Universal',

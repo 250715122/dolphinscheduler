@@ -998,6 +998,22 @@ export default {
     is_production_tips: 'is production',
     json_format_tips: 'JSON参数格式异常'
   },
+  recycle: {
+    name: '工作流名称',
+    task_count: '任务数',
+    delete_time: '删除时间',
+    remaining: '剩余保留',
+    days: '{n} 天',
+    operation: '操作',
+    restore: '恢复',
+    restore_confirm: '恢复该工作流？恢复后为下线状态，运行实例不会恢复。',
+    restore_success: '已恢复，请到工作流定义中查看',
+    purge: '彻底删除',
+    purge_confirm: '彻底删除后无法找回，确定吗？',
+    purge_success: '已彻底删除',
+    search: '请输入工作流名称',
+    tip: '已删除的工作流保留 {n} 天后自动彻底删除。恢复后工作流和定时配置为下线状态，历史运行实例无法找回，工作流编码会重新生成。'
+  },
   menu: {
     fav: '收藏组件',
     universal: '通用组件',

@@ -84,7 +84,9 @@ export default {
   ops_group_other: 'Other',
   ops_compact_hint: 'Compact mode for sparse data',
   ops_workbench: 'Instance workbench',
-  ops_search_instance: 'Search instance name',
+  ops_search_instance:
+    'Search instances, or type a task name (2+ chars) to find its project',
+  ops_goto: 'Go to',
   ops_tab_failure: 'Failed',
   ops_tab_running: 'Running',
   ops_tab_waiting: 'Waiting',

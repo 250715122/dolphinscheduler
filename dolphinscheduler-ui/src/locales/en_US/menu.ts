@@ -61,5 +61,21 @@ export default {
   task_group_queue: 'Task Group Queue',
   task_result: 'Task Result',
   rule: 'Rule management',
-  ui_setting: 'UI Setting'
+  ui_setting: 'UI Setting',
+  dev_spec: 'Dev Standards',
+  dev_spec_title: 'DolphinScheduler Task Development Standards',
+  dev_spec_tip: 'Rules to follow when developing and operating scheduled jobs.',
+  dev_spec_tip_must: 'must be fixed before go-live; ',
+  dev_spec_tip_should: 'should be followed unless there is a good reason.',
+  dev_spec_must: 'Must',
+  dev_spec_should: 'Should',
+  dev_spec_search: 'Search keywords, e.g. naming, idempotent, alert',
+  dev_spec_empty: 'No matching rules',
+  dev_spec_checklist: 'Go-live Checklist',
+  dev_spec_checklist_tip: 'Confirm each item before putting a workflow online:',
+  dev_spec_pitfalls: 'Known Pitfalls',
+  dev_spec_pitfall: 'Pitfall',
+  dev_spec_countermeasure: 'Countermeasure',
+  workflow_recycle_bin: 'Recycle Bin',
+  workflow_recycle_setting: 'Recycle Bin Setting'
 }

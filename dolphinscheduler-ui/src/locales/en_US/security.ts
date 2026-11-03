@@ -122,6 +122,13 @@ export default {
     cluster_config_tips: 'Please enter your cluster config',
     cluster_description_tips: 'Please enter your cluster description'
   },
+  recycle_setting_title: 'Workflow Recycle Bin Setting',
+  recycle_setting_tip: 'Workflows deleted inside a project go to the recycle bin first and are removed permanently after the retention period. A change applies to all projects immediately; items already in the bin get a new expiry based on the new value.',
+  recycle_setting_label: 'Keep deleted workflows for',
+  recycle_setting_unit: 'days',
+  recycle_setting_save: 'Save',
+  recycle_setting_saved: 'Saved',
+  recycle_setting_invalid: 'Enter a number of days between 1 and 3650',
   token: {
     create_token: 'Create Token',
     edit_token: 'Edit Token',

@@ -138,7 +138,11 @@ public abstract class AbstractAuthenticator implements Authenticator {
             return null;
         }
         // get user object from session
-        return userService.queryUser(session.getUserId());
+        User sessionUser = userService.queryUser(session.getUserId());
+        if (sessionUser != null) {
+            sessionService.refreshSession(session);
+        }
+        return sessionUser;
     }
 
 }

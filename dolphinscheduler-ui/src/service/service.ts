@@ -61,7 +61,9 @@ const baseRequestConfig: AxiosRequestConfig = {
 const service = axios.create(baseRequestConfig)
 
 const err = (err: AxiosError): Promise<AxiosError> => {
-  if (err.response?.status === 401 || err.response?.status === 504) {
+  // Only a real 401 means the session is gone. 504/502 are gateway/proxy hiccups
+  // (slow query, nginx timeout, restart) and must NOT wipe the login state.
+  if (err.response?.status === 401) {
     userStore.setSessionId('')
     userStore.setSecurityConfigType('')
     userStore.setUserInfo({})

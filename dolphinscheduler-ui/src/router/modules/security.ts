@@ -118,6 +118,17 @@ export default {
       }
     },
     {
+      path: '/security/workflow-recycle-setting',
+      name: 'workflow-recycle-setting',
+      component: components['security-workflow-recycle-setting'],
+      meta: {
+        title: '回收站设置',
+        activeMenu: 'security',
+        showSide: true,
+        auth: ['ADMIN_USER']
+      }
+    },
+    {
       path: '/security/alarm-instance-manage',
       name: 'alarm-instance-manage',
       component: components['security-alarm-instance-manage'],

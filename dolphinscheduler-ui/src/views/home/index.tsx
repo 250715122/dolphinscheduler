@@ -225,7 +225,7 @@ export default defineComponent({
                     ? t('home.ops_entity_workflow')
                     : t('home.ops_entity_task')
                 }
-                onUpdateKeyword={(v: string) => {
+                onUpdate:keyword={(v: string) => {
                   this.keyword = v
                 }}
                 onUpdate:page={(p: number) => (this.instancePage = p)}

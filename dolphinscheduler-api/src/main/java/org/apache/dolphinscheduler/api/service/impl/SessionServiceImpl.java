@@ -68,13 +68,16 @@ public class SessionServiceImpl extends BaseServiceImpl implements SessionServic
                 }
             }
             session = sessionList.get(0);
-            if (isSessionExpire(session)) {
+            if (!isSessionExpire(session)) {
+                // Still valid: reuse it so that a login from another browser/device does NOT
+                // invalidate the session that is already in use (upstream deleted it here, which
+                // made the earlier page get 401 and jump back to the login page).
                 session.setLastLoginTime(new Date());
                 sessionDao.updateById(session);
                 return session;
-            } else {
-                sessionDao.deleteById(session.getId());
             }
+            // expired: drop it and fall through to create a fresh one
+            sessionDao.deleteById(session.getId());
         }
 
         // assign new session
@@ -90,6 +93,22 @@ public class SessionServiceImpl extends BaseServiceImpl implements SessionServic
     @Override
     public void expireSession(Integer userId) {
         sessionDao.deleteByUserId(userId);
+    }
+
+    /** Sliding expiration: only touch the DB when the last refresh is older than this. */
+    private static final long REFRESH_THROTTLE_MS = 60_000L;
+
+    @Override
+    public void refreshSession(Session session) {
+        if (session == null || session.getLastLoginTime() == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (now - session.getLastLoginTime().getTime() < REFRESH_THROTTLE_MS) {
+            return;
+        }
+        session.setLastLoginTime(new Date(now));
+        sessionDao.updateById(session);
     }
 
     @Override

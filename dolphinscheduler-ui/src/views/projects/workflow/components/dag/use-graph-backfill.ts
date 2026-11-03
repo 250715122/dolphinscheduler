@@ -16,6 +16,7 @@
  */
 
 import { Ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useCustomCellBuilder } from './dag-hooks'
 import type { Graph } from '@antv/x6'
 import { WorkflowDefinition } from './types'
@@ -30,12 +31,27 @@ interface Options {
  */
 export function useGraphBackfill(options: Options) {
   const { graph, definition } = options
+  const route = useRoute()
 
   const { buildGraph } = useCustomCellBuilder()
+
+  // Deep link from global task search: ?taskCode=xxx selects and centers that node once.
+  let focused = false
+  const focusTaskFromQuery = () => {
+    const code = route.query.taskCode
+    if (focused || !code || !graph.value) return
+    const cell = graph.value.getCellById(String(code))
+    if (!cell) return
+    focused = true
+    graph.value.cleanSelection()
+    graph.value.select(cell)
+    graph.value.scrollToCell(cell, { animation: { duration: 600 } })
+  }
 
   watch([graph, definition], () => {
     if (graph.value && definition.value) {
       graph.value.fromJSON(buildGraph(definition.value))
+      focusTaskFromQuery()
     }
   })
 

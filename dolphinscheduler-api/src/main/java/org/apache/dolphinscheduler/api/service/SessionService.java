@@ -29,4 +29,7 @@ public interface SessionService {
     void expireSession(Integer userId);
 
     boolean isSessionExpire(Session session);
+
+    /** Sliding expiration: extend the session while the user is active (throttled). */
+    void refreshSession(Session session);
 }

@@ -37,8 +37,9 @@ CREATE TABLE IF NOT EXISTS `t_ds_workflow_recycle` (
 -- global key/value settings editable in Security Center
 CREATE TABLE IF NOT EXISTS `t_ds_system_setting` (
   `setting_key` varchar(64) NOT NULL COMMENT "key",
-  `setting_value` varchar(255) DEFAULT NULL COMMENT "value",
+  `setting_value` longtext COMMENT "value",
   `update_time` datetime DEFAULT NULL COMMENT "update time",
   PRIMARY KEY (`setting_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
+ALTER TABLE `t_ds_system_setting` MODIFY COLUMN `setting_value` longtext COMMENT "value";

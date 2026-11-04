@@ -21,76 +21,83 @@ import {
   NButton,
   NIcon,
   NModal,
-  NTag,
-  NTabs,
-  NTabPane,
   NScrollbar,
-  NInput
+  NInput,
+  NSpace,
+  NSpin,
+  NPopconfirm,
+  useMessage
 } from 'naive-ui'
 import { FileTextOutlined } from '@vicons/antd'
-import { specSections, checklist, pitfalls } from './spec-data'
+import { axios } from '@/service/service'
+import { defaultSpec, renderMarkdown } from './spec-data'
 import styles from './index.module.scss'
+
+interface SpecRes {
+  content: string | null
+  updateTime: string | null
+  updater: string | null
+  editable: boolean
+}
 
 const DevSpec = defineComponent({
   name: 'DevSpec',
   setup() {
     const { t } = useI18n()
+    const message = useMessage()
     const show = ref(false)
-    const keyword = ref('')
-    const tab = ref('naming')
+    const loading = ref(false)
+    const saving = ref(false)
+    const editing = ref(false)
+    const editable = ref(false)
+    const content = ref(defaultSpec)
+    const draft = ref('')
+    const meta = ref('')
 
-    const kw = computed(() => keyword.value.trim().toLowerCase())
-    const match = (s: string) => !kw.value || s.toLowerCase().includes(kw.value)
+    const html = computed(() => renderMarkdown(editing.value ? draft.value : content.value))
 
-    const filteredSections = computed(() =>
-      specSections
-        .map((sec) => ({
-          ...sec,
-          rules: sec.rules.filter((r) => match(r.text) || match(sec.title))
-        }))
-        .filter((sec) => sec.rules.length > 0)
-    )
+    const load = async () => {
+      loading.value = true
+      try {
+        const res = (await axios({ url: '/system-settings/dev-spec', method: 'get' })) as unknown as SpecRes
+        editable.value = !!res.editable
+        content.value = res.content && res.content.trim() ? res.content : defaultSpec
+        meta.value = res.updater && res.updateTime ? `${res.updater} · ${res.updateTime}` : ''
+      } catch (e) {
+        // older backend or network error: fall back to the built-in content, read only
+        editable.value = false
+        content.value = defaultSpec
+      } finally {
+        loading.value = false
+      }
+    }
 
-    const renderRule = (level: 'M' | 'R', text: string, idx: number) => (
-      <li key={idx} class={styles.rule}>
-        <NTag
-          size='small'
-          bordered={false}
-          type={level === 'M' ? 'error' : 'info'}
-          style='flex:none;margin-right:8px'
-        >
-          {level === 'M' ? t('menu.dev_spec_must') : t('menu.dev_spec_should')}
-        </NTag>
-        <span>{text}</span>
-      </li>
-    )
+    const open = () => {
+      show.value = true
+      editing.value = false
+      load()
+    }
 
-    const renderTable = (head: string[], rows: string[][]) => (
-      <table class={styles.table}>
-        <thead>
-          <tr>
-            {head.map((h) => (
-              <th>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr>
-              {r.map((c) => (
-                <td>
-                  <code>{c}</code>
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    )
+    const startEdit = () => {
+      draft.value = content.value
+      editing.value = true
+    }
+
+    const save = async (value: string) => {
+      saving.value = true
+      try {
+        await axios({ url: '/system-settings/dev-spec', method: 'put', data: { content: value } })
+        message.success(t('menu.dev_spec_saved'))
+        editing.value = false
+        await load()
+      } finally {
+        saving.value = false
+      }
+    }
 
     return () => (
       <>
-        <NButton quaternary onClick={() => (show.value = true)}>
+        <NButton quaternary onClick={open}>
           {{
             icon: () => (
               <NIcon size='16'>
@@ -105,81 +112,67 @@ const DevSpec = defineComponent({
           onUpdateShow={(v: boolean) => (show.value = v)}
           preset='card'
           title={t('menu.dev_spec_title')}
-          style='width: min(980px, 94vw)'
-          segmented={{ content: true }}
+          style={editing.value ? 'width: min(1200px, 96vw)' : 'width: min(820px, 94vw)'}
+          segmented={{ content: true, footer: 'soft' }}
+          maskClosable={!editing.value}
         >
-          <div class={styles.tip}>
-            {t('menu.dev_spec_tip')}
-            <NTag size='small' bordered={false} type='error' style='margin:0 4px'>
-              {t('menu.dev_spec_must')}
-            </NTag>
-            {t('menu.dev_spec_tip_must')}
-            <NTag size='small' bordered={false} type='info' style='margin:0 4px'>
-              {t('menu.dev_spec_should')}
-            </NTag>
-            {t('menu.dev_spec_tip_should')}
-          </div>
-          <NInput
-            value={keyword.value}
-            clearable
-            size='small'
-            placeholder={t('menu.dev_spec_search')}
-            style='margin-bottom:10px'
-            onUpdateValue={(v: string) => (keyword.value = v)}
-          />
-          {kw.value ? (
-            <NScrollbar style='max-height: 62vh'>
-              {filteredSections.value.length === 0 ? (
-                <div class={styles.empty}>{t('menu.dev_spec_empty')}</div>
-              ) : (
-                filteredSections.value.map((sec) => (
-                  <div class={styles.section}>
-                    <h4>{sec.title}</h4>
-                    <ul>{sec.rules.map((r, i) => renderRule(r.level, r.text, i))}</ul>
+          {{
+            'header-extra': () =>
+              editable.value && !editing.value ? (
+                <NButton size='small' type='primary' secondary onClick={startEdit}>
+                  {t('menu.dev_spec_edit')}
+                </NButton>
+              ) : null,
+            default: () => (
+              <NSpin show={loading.value}>
+                {editing.value ? (
+                  <div class={styles.editor}>
+                    <NInput
+                      type='textarea'
+                      value={draft.value}
+                      onUpdateValue={(v: string) => (draft.value = v)}
+                      placeholder={t('menu.dev_spec_placeholder')}
+                      style='height: 62vh; font-family: Menlo, Consolas, monospace; font-size: 13px'
+                    />
+                    <NScrollbar style='height: 62vh'>
+                      <div class={styles.md} innerHTML={html.value} />
+                    </NScrollbar>
                   </div>
-                ))
-              )}
-            </NScrollbar>
-          ) : (
-            <NTabs
-              type='line'
-              animated
-              value={tab.value}
-              onUpdateValue={(v: string) => (tab.value = v)}
-            >
-              {specSections.map((sec) => (
-                <NTabPane name={sec.key} tab={sec.title}>
-                  <NScrollbar style='max-height: 58vh'>
-                    <ul class={styles.list}>
-                      {sec.rules.map((r, i) => renderRule(r.level, r.text, i))}
-                    </ul>
-                    {sec.table ? renderTable(sec.table.head, sec.table.rows) : null}
+                ) : (
+                  <NScrollbar style='max-height: 66vh'>
+                    <div class={styles.md} innerHTML={html.value} />
                   </NScrollbar>
-                </NTabPane>
-              ))}
-              <NTabPane name='checklist' tab={t('menu.dev_spec_checklist')}>
-                <NScrollbar style='max-height: 58vh'>
-                  <div class={styles.tip}>{t('menu.dev_spec_checklist_tip')}</div>
-                  <ul class={styles.list}>
-                    {checklist.map((c, i) => (
-                      <li key={i} class={styles.rule}>
-                        <span style='margin-right:8px'>☐</span>
-                        <span>{c}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </NScrollbar>
-              </NTabPane>
-              <NTabPane name='pitfalls' tab={t('menu.dev_spec_pitfalls')}>
-                <NScrollbar style='max-height: 58vh'>
-                  {renderTable(
-                    [t('menu.dev_spec_pitfall'), t('menu.dev_spec_countermeasure')],
-                    pitfalls.map((p) => [p[0], p[1]])
-                  )}
-                </NScrollbar>
-              </NTabPane>
-            </NTabs>
-          )}
+                )}
+              </NSpin>
+            ),
+            footer: () =>
+              editing.value ? (
+                <NSpace justify='space-between'>
+                  <NPopconfirm onPositiveClick={() => save('')}>
+                    {{
+                      trigger: () => (
+                        <NButton size='small' quaternary type='warning'>
+                          {t('menu.dev_spec_reset')}
+                        </NButton>
+                      ),
+                      default: () => t('menu.dev_spec_reset_confirm')
+                    }}
+                  </NPopconfirm>
+                  <NSpace>
+                    <NButton size='small' onClick={() => (editing.value = false)}>
+                      {t('menu.dev_spec_cancel')}
+                    </NButton>
+                    <NButton size='small' type='primary' loading={saving.value} onClick={() => save(draft.value)}>
+                      {t('menu.dev_spec_save')}
+                    </NButton>
+                  </NSpace>
+                </NSpace>
+              ) : meta.value ? (
+                <div class={styles.meta}>
+                  {t('menu.dev_spec_updated')}：{meta.value}
+                </div>
+              ) : null
+          }}
         </NModal>
       </>
     )

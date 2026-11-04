@@ -39,8 +39,9 @@ CREATE INDEX IF NOT EXISTS workflow_recycle_idx_delete_time ON t_ds_workflow_rec
 -- global key/value settings editable in Security Center
 CREATE TABLE IF NOT EXISTS t_ds_system_setting (
   setting_key varchar(64) NOT NULL,
-  setting_value varchar(255) DEFAULT NULL,
+  setting_value text DEFAULT NULL,
   update_time timestamp DEFAULT NULL,
   PRIMARY KEY (setting_key)
 );
 
+ALTER TABLE t_ds_system_setting ALTER COLUMN setting_value TYPE text;

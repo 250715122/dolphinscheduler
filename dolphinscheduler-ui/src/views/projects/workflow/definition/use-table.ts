@@ -176,7 +176,12 @@ export function useTable() {
                       // 有描述：鼠标移到名称上，浮层显示名称 + 描述
                       return h(
                         NTooltip,
-                        { style: 'max-width: 480px', placement: 'top-start' },
+                        {
+                          style: 'max-width: 480px',
+                          // 显示在名称右侧，不再盖住上一行；鼠标离开名称即消失
+                          placement: 'right-start',
+                          keepAliveOnHover: false
+                        },
                         {
                           // NEllipsis 会覆盖外部传入的 mouseenter，所以外面包一层 span 接收悬停事件
                           trigger: () =>

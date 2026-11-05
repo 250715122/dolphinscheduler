@@ -30,6 +30,7 @@ import org.apache.dolphinscheduler.api.utils.PageInfo;
 import org.apache.dolphinscheduler.api.utils.Result;
 import org.apache.dolphinscheduler.common.constants.Constants;
 import org.apache.dolphinscheduler.common.enums.TaskExecuteType;
+import org.apache.dolphinscheduler.common.model.Server;
 import org.apache.dolphinscheduler.common.utils.DateUtils;
 import org.apache.dolphinscheduler.dao.entity.Project;
 import org.apache.dolphinscheduler.dao.entity.TaskInstance;
@@ -47,6 +48,8 @@ import org.apache.dolphinscheduler.extract.worker.IStreamingTaskInstanceOperator
 import org.apache.dolphinscheduler.extract.worker.transportor.TaskInstanceTriggerSavepointRequest;
 import org.apache.dolphinscheduler.extract.worker.transportor.TaskInstanceTriggerSavepointResponse;
 import org.apache.dolphinscheduler.plugin.task.api.enums.TaskExecutionStatus;
+import org.apache.dolphinscheduler.registry.api.RegistryClient;
+import org.apache.dolphinscheduler.registry.api.enums.RegistryNodeType;
 import org.apache.dolphinscheduler.service.process.ProcessService;
 import org.apache.dolphinscheduler.task.executor.operations.TaskExecutorKillRequest;
 import org.apache.dolphinscheduler.task.executor.operations.TaskExecutorKillResponse;
@@ -97,6 +100,9 @@ public class TaskInstanceServiceImpl extends BaseServiceImpl implements TaskInst
 
     @Autowired
     private WorkflowInstanceDao workflowInstanceDao;
+
+    @Autowired
+    private RegistryClient registryClient;
 
     /**
      * query task list by project, workflow instance, task name, task start time, task end time, task status, keyword paging
@@ -322,8 +328,24 @@ public class TaskInstanceServiceImpl extends BaseServiceImpl implements TaskInst
         if (org.apache.commons.collections4.CollectionUtils.isEmpty(needToDeleteTaskInstances)) {
             return;
         }
+        // Only call hosts that are alive in registry; stale hosts (e.g. old docker bridge IPs) would block
+        // the request for a connect-timeout per task instance and make the UI look unresponsive.
+        java.util.Set<String> aliveHosts = new java.util.HashSet<>();
+        try {
+            for (RegistryNodeType type : new RegistryNodeType[]{RegistryNodeType.WORKER, RegistryNodeType.MASTER}) {
+                for (Server server : registryClient.getServerList(type)) {
+                    aliveHosts.add(server.getHost() + ":" + server.getPort());
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Query alive servers from registry failed, skip remote log removal", ex);
+        }
         for (TaskInstance taskInstance : needToDeleteTaskInstances) {
             if (StringUtils.isNotBlank(taskInstance.getLogPath())) {
+                if (!aliveHosts.contains(taskInstance.getHost())) {
+                    log.debug("Skip remove task instance log, host {} is not alive", taskInstance.getHost());
+                    continue;
+                }
                 try {
                     // Remove task instance log failed will not affect the deletion of task instance
                     Clients

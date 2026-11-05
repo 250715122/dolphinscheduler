@@ -178,14 +178,19 @@ export function useTable() {
                         NTooltip,
                         { style: 'max-width: 480px', placement: 'top-start' },
                         {
+                          // NEllipsis 会覆盖外部传入的 mouseenter，所以外面包一层 span 接收悬停事件
                           trigger: () =>
                             h(
-                              NEllipsis,
-                              {
-                                style: 'max-width: 580px;line-height: 1.5',
-                                tooltip: false
-                              },
-                              () => row.name
+                              'span',
+                              { style: 'display: inline-block; max-width: 580px;' },
+                              h(
+                                NEllipsis,
+                                {
+                                  style: 'max-width: 580px;line-height: 1.5',
+                                  tooltip: false
+                                },
+                                () => row.name
+                              )
                             ),
                           default: () =>
                             h('div', { style: 'white-space: pre-wrap; word-break: break-all;' }, [

@@ -164,14 +164,37 @@ export function useTable() {
                     }
                   },
                   {
-                    default: () =>
-                      h(
-                        NEllipsis,
+                    default: () => {
+                      const desc = (row.description || '').trim()
+                      if (!desc) {
+                        return h(
+                          NEllipsis,
+                          { style: 'max-width: 580px;line-height: 1.5' },
+                          () => row.name
+                        )
+                      }
+                      // 有描述：鼠标移到名称上，浮层显示名称 + 描述
+                      return h(
+                        NTooltip,
+                        { style: 'max-width: 480px', placement: 'top-start' },
                         {
-                          style: 'max-width: 580px;line-height: 1.5'
-                        },
-                        () => row.name
+                          trigger: () =>
+                            h(
+                              NEllipsis,
+                              {
+                                style: 'max-width: 580px;line-height: 1.5',
+                                tooltip: false
+                              },
+                              () => row.name
+                            ),
+                          default: () =>
+                            h('div', { style: 'white-space: pre-wrap; word-break: break-all;' }, [
+                              h('div', { style: 'font-weight: 600; margin-bottom: 4px;' }, row.name),
+                              h('div', null, desc)
+                            ])
+                        }
                       )
+                    }
                   }
                 )
             }
